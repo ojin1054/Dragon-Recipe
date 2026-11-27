@@ -72,32 +72,35 @@ namespace DragonRecipe.Tribes
         /// 엘프 공격 → 엘프 적대감 크게 상승.
         /// 참전 중이면 적 편 공격은 승률을 올리고, 편든 쪽 공격은 깎는다.
         /// </summary>
-        public static void RegisterAttack(TribeState state, TribeSettings s, Tribe target)
+        /// <param name="repScale">호감도 변화 배율 (방어전 침입자는 작게: 수십 명을 쓰러뜨려도 한 번에 치솟지 않게)</param>
+        /// <param name="contribution">참전 중 승률 기여 (쓰러뜨린 수)</param>
+        public static void RegisterAttack(TribeState state, TribeSettings s, Tribe target, float repScale = 1f, float contribution = 1f)
         {
             var rec = state.Get(target);
             if (rec != null) rec.attacksReceived++;
+            float k = Mathf.Max(0f, repScale);
             switch (target)
             {
                 case Tribe.Human:
-                    Add(state, Tribe.Human, -s.attackedLoss, s);
-                    Add(state, Tribe.Orc, s.rivalGain, s);
-                    Add(state, Tribe.Elf, s.elfSideGain, s);
+                    Add(state, Tribe.Human, -s.attackedLoss * k, s);
+                    Add(state, Tribe.Orc, s.rivalGain * k, s);
+                    Add(state, Tribe.Elf, s.elfSideGain * k, s);
                     break;
                 case Tribe.Orc:
-                    Add(state, Tribe.Orc, -s.attackedLoss, s);
-                    Add(state, Tribe.Human, s.rivalGain, s);
-                    Add(state, Tribe.Elf, s.elfSideGain, s);
+                    Add(state, Tribe.Orc, -s.attackedLoss * k, s);
+                    Add(state, Tribe.Human, s.rivalGain * k, s);
+                    Add(state, Tribe.Elf, s.elfSideGain * k, s);
                     break;
                 case Tribe.Elf:
-                    Add(state, Tribe.Elf, -s.elfAttackedLoss, s);
+                    Add(state, Tribe.Elf, -s.elfAttackedLoss * k, s);
                     break;
             }
 
             var war = state.war;
             if (war.status == WarStatus.Joined)
             {
-                if (target == war.Enemy(war.joined)) war.contribution += 1f;
-                else if (target == war.joined) war.contribution = Mathf.Max(0f, war.contribution - 1f);
+                if (target == war.Enemy(war.joined)) war.contribution += contribution;
+                else if (target == war.joined) war.contribution = Mathf.Max(0f, war.contribution - contribution);
             }
         }
 
@@ -272,8 +275,22 @@ namespace DragonRecipe.Tribes
             return true;
         }
 
+        /// <summary>승률 = 기본 + 적 편 공격 × 오름폭 − 뚫린 횟수 × 깎임폭</summary>
         public static float WinChance(WarState war, TribeSettings s)
-            => Mathf.Clamp(s.baseWinChance + war.contribution * s.winChancePerAttack, 0f, s.maxWinChance);
+            => Mathf.Clamp(s.baseWinChance + war.contribution * s.winChancePerAttack - war.breaches * s.breachPenalty,
+                s.minWinChance, s.maxWinChance);
+
+        /// <summary>적이 편든 쪽 마을까지 뚫고 들어옴: 승률이 깎이고 편든 쪽이 조금 실망한다</summary>
+        public static void RegisterBreach(TribeState state, TribeSettings s)
+        {
+            var war = state.war;
+            if (war.status != WarStatus.Joined) return;
+            war.breaches++;
+            Add(state, war.joined, -s.breachRepLoss, s);
+        }
+
+        /// <summary>방어전 무리 크기 (0 = 첫 무리)</summary>
+        public static int RaidSize(int wave, TribeSettings s) => Mathf.Max(1, s.raidBaseSize + wave * s.raidGrowth);
 
         static void ResolveWar(TribeState state, TribeSettings s, Func<float> rand, TribeReport report)
         {

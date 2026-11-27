@@ -19,7 +19,7 @@ namespace DragonRecipe.Tribes
     /// 공격·스킬은 Hit / AttackArea / Stun / Knockback / ClearProjectilesIn으로.
     /// 프리미티브만 쓰고 콜라이더가 없어 드래곤 충돌 판정에 걸리지 않는다. 비행 씬에 스스로 붙는다.
     /// </summary>
-    public class TribeWorld : MonoBehaviour
+    public partial class TribeWorld : MonoBehaviour
     {
         public static TribeWorld Instance { get; private set; }
 
@@ -66,6 +66,9 @@ namespace DragonRecipe.Tribes
             public float damage;
             public bool stuck;
             public bool hurtsDragon;
+            /// <summary>방어전: 이 종족의 침입자를 맞히면 쓰러뜨린다 (편든 쪽 병사가 쏜 화살)</summary>
+            public bool hitsRaiders;
+            public Tribe raiderTribe;
         }
 
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -126,7 +129,10 @@ namespace DragonRecipe.Tribes
             session.StateChanged += OnStateChanged;
             session.Caught += OnCaught;
             DragonCare.TribesChanged += OnTribesChanged;
+            _homeNest = session.nest;
+            _homeEdge = session.launchEdge;
             Build();
+            ApplyLaunchSite();
         }
 
         static TribeState State => DragonCare.IsLoaded ? DragonCare.Tribes : null;
@@ -135,7 +141,9 @@ namespace DragonRecipe.Tribes
         void OnStateChanged(FlightSession.State s)
         {
             // 다시 날기: 바뀐 호감도·전쟁에 맞춰 주민과 병사를 새로 세운다
-            if (s == FlightSession.State.Ready && _built) Populate();
+            if (s != FlightSession.State.Ready || !_built) return;
+            Populate();
+            ApplyLaunchSite(); // 참전 중이면 편든 쪽 망루에서 출발
         }
 
         void OnTribesChanged()
@@ -160,6 +168,14 @@ namespace DragonRecipe.Tribes
             if (new Vector2(d.x, d.z).magnitude <= elfLandRadius) DragonCare.ReportElfLandHunt();
         }
 
+        /// <summary>호감도·전쟁이 바뀐 걸 바로 보이게 주민·병사·전쟁터를 다시 세운다 (디버그용)</summary>
+        public void Repopulate()
+        {
+            if (!_built) return;
+            Populate();
+            ApplyLaunchSite();
+        }
+
         // ───────── 공격·스킬용 API ─────────
 
         /// <summary>범위 안의 (쓰러지지 않은) 주민·병사</summary>
@@ -179,7 +195,7 @@ namespace DragonRecipe.Tribes
         public bool Hit(TribeMember m)
         {
             if (!KnockDown(m)) return false;
-            DragonCare.ReportTribeAttack(m.Tribe);
+            DragonCare.ReportTribeAttack(m.Tribe, m.IsRaider ? Settings.raiderRepScale : 1f);
             return true;
         }
 
@@ -187,21 +203,19 @@ namespace DragonRecipe.Tribes
         public int AttackArea(Vector3 center, float radius)
         {
             int hit = 0;
-            bool human = false, orc = false, elf = false;
+            var count = new int[3];
+            var civilian = new bool[3]; // 침입자가 아닌 주민·병사도 맞혔는지
             foreach (var m in MembersIn(center, radius))
             {
                 if (!KnockDown(m)) continue;
                 hit++;
-                switch (m.Tribe)
-                {
-                    case Tribe.Human: human = true; break;
-                    case Tribe.Orc: orc = true; break;
-                    default: elf = true; break;
-                }
+                count[(int)m.Tribe]++;
+                if (!m.IsRaider) civilian[(int)m.Tribe] = true;
             }
-            if (human) DragonCare.ReportTribeAttack(Tribe.Human);
-            if (orc) DragonCare.ReportTribeAttack(Tribe.Orc);
-            if (elf) DragonCare.ReportTribeAttack(Tribe.Elf);
+            // 종족마다 호감도는 한 번만, 승률 기여는 쓰러뜨린 수만큼
+            foreach (var t in TribeLogic.All)
+                if (count[(int)t] > 0)
+                    DragonCare.ReportTribeAttack(t, civilian[(int)t] ? 1f : Settings.raiderRepScale, count[(int)t]);
             return hit;
         }
 
@@ -284,6 +298,7 @@ namespace DragonRecipe.Tribes
 
             foreach (var m in _members)
                 if (m) UpdateMember(m, dt, st, flying, target, targetVel);
+            UpdateDefense(dt, st, flying);
             UpdateProjectiles(dt, flying, dragon, target, hitRadius);
             UpdateFlags(dt, st);
         }
@@ -311,6 +326,11 @@ namespace DragonRecipe.Tribes
             {
                 SetPose(m, pos, Quaternion.Euler(0f, tr.eulerAngles.y + 360f * dt, 0f), 0f); // 빙글빙글
                 Tint(m.tip, TipIdle);
+                return;
+            }
+            if (m.IsRaider)
+            {
+                UpdateRaider(m, dt, pos, flying, target, targetVel);
                 return;
             }
 
@@ -346,7 +366,13 @@ namespace DragonRecipe.Tribes
             else if (canShoot)
             {
                 face = new Vector3(toTarget.x, 0f, toTarget.z);
+                m.aimOffset = toTarget;
                 AimAndFire(m, dt, target, targetVel, true);
+            }
+            else if (m.IsSoldier && !m.IsWarParty && TryDefend(m, dt, pos, out var defendFace))
+            {
+                // 방어전: 편든 쪽 병사가 다가오는 침입자를 쏜다
+                face = defendFace;
             }
             else
             {
@@ -355,7 +381,8 @@ namespace DragonRecipe.Tribes
                     // 전쟁터: 마주 본 적 편을 향해 쏜다 (드래곤은 다치지 않는 화살)
                     face = m.warFacing;
                     hop = Mathf.Abs(Mathf.Sin(Time.time * 6f + m.phase)) * 0.15f;
-                    if (m.IsSoldier) AimAndFire(m, dt, pos + m.warFacing * 14f + Vector3.up * 1.2f, Vector3.zero, false);
+                    m.aimOffset = m.warFacing * 14f + Vector3.up * 1.2f;
+                    if (m.IsSoldier) AimAndFire(m, dt, pos + m.aimOffset, Vector3.zero, false);
                 }
                 else
                 {
@@ -392,16 +419,21 @@ namespace DragonRecipe.Tribes
                 : tr.rotation;
             SetPose(m, pos, rot, hop);
 
-            // 시위를 당기는 동안 무기가 들리고 끝이 빨개진다
-            var combat = s.Combat(m.Tribe);
+            AnimateWeapon(m, dt);
+        }
+
+        /// <summary>시위를 당기는 동안 무기가 조준점(aimOffset) 쪽으로 들리고 끝이 빨개진다</summary>
+        void AnimateWeapon(TribeMember m, float dt)
+        {
+            var combat = Settings.Combat(m.Tribe);
             float draw = m.aim > 0f ? 1f - m.aim / Mathf.Max(0.01f, combat.aimTime) : 0f;
             if (m.weapon)
             {
                 float pitch = 60f;
                 if (draw > 0f)
                 {
-                    Vector3 aimAt = canShoot ? toTarget : m.warFacing * 14f + Vector3.up * 1.2f;
-                    pitch = -Mathf.Clamp(Mathf.Atan2(aimAt.y, new Vector2(aimAt.x, aimAt.z).magnitude) * Mathf.Rad2Deg, -10f, 80f);
+                    var a = m.aimOffset;
+                    pitch = -Mathf.Clamp(Mathf.Atan2(a.y, new Vector2(a.x, a.z).magnitude) * Mathf.Rad2Deg, -10f, 80f);
                 }
                 m.weapon.localRotation = Quaternion.Slerp(m.weapon.localRotation, Quaternion.Euler(pitch, 0f, 0f), 10f * dt);
             }
@@ -428,26 +460,28 @@ namespace DragonRecipe.Tribes
             m.transform.SetPositionAndRotation(pos, rot);
         }
 
-        void AimAndFire(TribeMember m, float dt, Vector3 target, Vector3 targetVel, bool atDragon)
+        /// <param name="raiderTribe">방어전: 이 종족의 침입자를 맞히는 화살 (편든 쪽 병사)</param>
+        void AimAndFire(TribeMember m, float dt, Vector3 target, Vector3 targetVel, bool atDragon, Tribe? raiderTribe = null)
         {
             var combat = Settings.Combat(m.Tribe);
             if (m.aim > 0f)
             {
                 m.aim -= dt;
                 if (m.aim > 0f) return;
-                Fire(m, combat, target, targetVel, atDragon);
-                m.reload = Random.Range(combat.reloadMin, combat.reloadMax) * (atDragon ? 1f : 1.5f);
+                Fire(m, combat, target, targetVel, atDragon, raiderTribe);
+                float scale = atDragon ? 1f : raiderTribe.HasValue ? Settings.allyReloadScale : 1.5f;
+                m.reload = Random.Range(combat.reloadMin, combat.reloadMax) * scale;
                 return;
             }
             m.reload -= dt;
             if (m.reload <= 0f) m.aim = combat.aimTime;
         }
 
-        void Fire(TribeMember m, TribeCombat combat, Vector3 target, Vector3 targetVel, bool atDragon)
+        void Fire(TribeMember m, TribeCombat combat, Vector3 target, Vector3 targetVel, bool atDragon, Tribe? raiderTribe = null)
         {
             Vector3 from = m.tip ? m.tip.transform.position : m.transform.position + Vector3.up * 1.4f;
             HostileRules.LeadDirection(from, target, targetVel, combat.projectileSpeed, out var dir);
-            float spread = combat.spread * (atDragon ? 1f : 3f);
+            float spread = combat.spread * (atDragon || raiderTribe.HasValue ? 1f : 3f);
             dir = Quaternion.Euler(Random.Range(-spread, spread), Random.Range(-spread, spread), 0f) * dir;
 
             bool spear = m.Tribe == Tribe.Orc;
@@ -464,7 +498,11 @@ namespace DragonRecipe.Tribes
             trail.startColor = new Color(c.r, c.g, c.b, 0.8f);
             trail.endColor = new Color(c.r, c.g, c.b, 0f);
             trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            _projectiles.Add(new Projectile { t = go.transform, velocity = dir * combat.projectileSpeed, damage = combat.damage, hurtsDragon = atDragon });
+            _projectiles.Add(new Projectile
+            {
+                t = go.transform, velocity = dir * combat.projectileSpeed, damage = combat.damage, hurtsDragon = atDragon,
+                hitsRaiders = raiderTribe.HasValue, raiderTribe = raiderTribe ?? Tribe.Human
+            });
         }
 
         void UpdateProjectiles(float dt, bool flying, DragonFlightController dragon, Vector3 target, float hitRadius)
@@ -488,6 +526,12 @@ namespace DragonRecipe.Tribes
 
                 Vector3 from = p.t.position;
                 Vector3 to = from + p.velocity * dt;
+                if (p.hitsRaiders && HitRaider(from, to, p.raiderTribe))
+                {
+                    Destroy(p.t.gameObject);
+                    _projectiles.RemoveAt(i);
+                    continue;
+                }
                 if (p.hurtsDragon && flying && HostileRules.SegmentDistance(from, to, target) <= hitRadius)
                 {
                     dragon.ApplyDamage(p.damage);
@@ -584,6 +628,7 @@ namespace DragonRecipe.Tribes
                     }
                 }
             }
+            ResetDefense();
         }
 
         static Vector3 Around(Vector3 center, float radius)

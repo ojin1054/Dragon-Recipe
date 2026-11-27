@@ -13,6 +13,8 @@ namespace DragonRecipe.Tribes
         public bool IsSoldier { get; internal set; }
         /// <summary>전쟁터에 나간 병사</summary>
         public bool IsWarParty { get; internal set; }
+        /// <summary>방어전: 편든 쪽 마을로 몰려오는 적</summary>
+        public bool IsRaider { get; internal set; }
         /// <summary>공격받아 쓰러져 있음</summary>
         public bool IsDown => Time.time < downUntil;
         /// <summary>기절·둔화 등으로 멈춰 있음</summary>
@@ -35,5 +37,9 @@ namespace DragonRecipe.Tribes
         internal float phase;
         /// <summary>전쟁터에서 마주 보는 쪽</summary>
         internal Vector3 warFacing;
+        /// <summary>무기를 겨누는 쪽 (자기 위치 기준)</summary>
+        internal Vector3 aimOffset;
+        /// <summary>방어전: 마을 가운데에 닿음 (다음 정리 때 뚫림 처리)</summary>
+        internal bool pendingBreach;
     }
 }

@@ -41,6 +41,13 @@ namespace DragonRecipe.Tribes
         RectTransform _war;
         string _altarKey, _warKey;
 
+        // 비행 중 방어전 표시: 편든 쪽 얼굴 + 방어 칸, 적 얼굴 + 남은 침입자·무리
+        RectTransform _defense;
+        Image _defAlly, _defEnemy;
+        Text _defPips, _defEnemyCount;
+        int _defShownLeft = -1;
+        float _defShake;
+
         // ───────── 자동 부착 ─────────
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -79,6 +86,7 @@ namespace DragonRecipe.Tribes
             if (_compact)
             {
                 Place(_root, new Vector2(1, 1), new Vector2(-40, -195), new Vector2(390, 120), new Vector2(1, 1));
+                BuildDefense();
             }
             else
             {
@@ -110,6 +118,56 @@ namespace DragonRecipe.Tribes
         }
 
         void OnDestroy() => DragonCare.TribesChanged -= OnTribesChanged;
+
+        void BuildDefense()
+        {
+            _defense = Box(_root, "Defense", new Vector2(1, 0), new Vector2(0, -12), new Vector2(390, 120));
+            _defense.pivot = new Vector2(1, 1);
+            Img(_defense, "Bg", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Color(0.25f, 0.06f, 0.06f, 0.7f));
+
+            _defAlly = Img(_defense, "Ally", new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -32), new Vector2(52, 52), Color.white);
+            _defPips = Text(_defense, "", Vector2.zero, 30, TribeLook.FriendlyColor);
+            Place(_defPips.rectTransform, new Vector2(0, 1), new Vector2(78, -32), new Vector2(300, 50), new Vector2(0, 0.5f));
+            _defPips.alignment = TextAnchor.MiddleLeft;
+
+            _defEnemy = Img(_defense, "Enemy", new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -88), new Vector2(52, 52), Color.white);
+            _defEnemyCount = Text(_defense, "", Vector2.zero, 30, Down);
+            Place(_defEnemyCount.rectTransform, new Vector2(0, 1), new Vector2(78, -88), new Vector2(300, 50), new Vector2(0, 0.5f));
+            _defEnemyCount.alignment = TextAnchor.MiddleLeft;
+            _defense.gameObject.SetActive(false);
+        }
+
+        void RefreshDefense(TribeState st)
+        {
+            if (!_defense) return;
+            var world = TribeWorld.Instance;
+            bool on = world && world.DefenseActive;
+            if (_defense.gameObject.activeSelf != on) _defense.gameObject.SetActive(on);
+            if (!on) return;
+
+            var war = st.war;
+            _defAlly.sprite = TribeLook.Face(war.joined);
+            _defEnemy.sprite = TribeLook.Face(war.Enemy(war.joined));
+            int left = world.DefenseLeft;
+            if (_defShownLeft >= 0 && left < _defShownLeft) _defShake = 1f; // 뚫리면 흔들림
+            _defShownLeft = left;
+            _defPips.text = new string('●', left) + new string('○', Mathf.Max(0, world.DefenseMax - left));
+            _defPips.color = left <= 1 ? Down : TribeLook.FriendlyColor;
+            // 남은 침입자 수 + 아직 오지 않은 무리 점
+            _defEnemyCount.text = $"x{world.RaidersAlive}  {new string('▲', world.WavesLeft)}";
+
+            if (_defShake > 0f)
+            {
+                _defShake = Mathf.Max(0f, _defShake - Time.unscaledDeltaTime * 2.5f);
+                _defAlly.rectTransform.anchoredPosition = new Vector2(40, -32) + Random.insideUnitCircle * 10f * _defShake;
+                _defAlly.color = Color.Lerp(Color.white, Down, _defShake);
+            }
+            else
+            {
+                _defAlly.rectTransform.anchoredPosition = new Vector2(40, -32);
+                _defAlly.color = Color.white;
+            }
+        }
 
         Gauge MakeGauge(Tribe t, float x)
         {
@@ -216,7 +274,11 @@ namespace DragonRecipe.Tribes
                 }
             }
 
-            if (_compact) return;
+            if (_compact)
+            {
+                RefreshDefense(st);
+                return;
+            }
             RefreshAltar(st);
             RefreshWar(st, s);
         }

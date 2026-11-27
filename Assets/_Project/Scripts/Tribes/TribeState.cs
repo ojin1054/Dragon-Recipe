@@ -77,6 +77,8 @@ namespace DragonRecipe.Tribes
         public int flightsLeft;
         /// <summary>참전한 뒤 적 편을 공격한 횟수 (승률을 올린다)</summary>
         public float contribution;
+        /// <summary>적이 편든 쪽 마을까지 뚫고 들어온 횟수 (승률을 깎는다)</summary>
+        public int breaches;
         /// <summary>다음 전쟁이 일어날 수 있을 때까지 남은 비행 횟수</summary>
         public int cooldown;
 

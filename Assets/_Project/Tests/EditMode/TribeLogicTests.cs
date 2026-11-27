@@ -235,6 +235,71 @@ namespace DragonRecipe.Tests
             Assert.AreEqual(WarStatus.Bystander, st.war.status);
         }
 
+        // ───────────── 방어전 ─────────────
+
+        static TribeState JoinedHumanVsOrc(TribeSettings s)
+        {
+            var st = TribeLogic.CreateNew(s);
+            st.Get(Tribe.Human).reputation = 30f;
+            TribeLogic.StartWar(st, s, (Tribe.Human, Tribe.Orc));
+            TribeLogic.JoinWar(st, s, Tribe.Human);
+            return st;
+        }
+
+        [Test]
+        public void Breach_LowersWinChance_AndDisappointsAlly()
+        {
+            var s = Settings();
+            var st = JoinedHumanVsOrc(s);
+            float chance = TribeLogic.WinChance(st.war, s);
+            float rep = Rep(st, Tribe.Human);
+            TribeLogic.RegisterBreach(st, s);
+            Assert.AreEqual(1, st.war.breaches);
+            Assert.AreEqual(chance - s.breachPenalty, TribeLogic.WinChance(st.war, s), 1e-4f);
+            Assert.AreEqual(rep - s.breachRepLoss, Rep(st, Tribe.Human), 1e-4f);
+        }
+
+        [Test]
+        public void WinChance_StaysWithinMinMax()
+        {
+            var s = Settings();
+            var st = JoinedHumanVsOrc(s);
+            for (int i = 0; i < 50; i++) TribeLogic.RegisterBreach(st, s);
+            Assert.AreEqual(s.minWinChance, TribeLogic.WinChance(st.war, s), 1e-4f);
+            st.war.breaches = 0;
+            st.war.contribution = 1000f;
+            Assert.AreEqual(s.maxWinChance, TribeLogic.WinChance(st.war, s), 1e-4f);
+        }
+
+        [Test]
+        public void RaiderKills_CountFullyForWar_ButMoveReputationLess()
+        {
+            var s = Settings();
+            var st = JoinedHumanVsOrc(s);
+            float human = Rep(st, Tribe.Human);
+            TribeLogic.RegisterAttack(st, s, Tribe.Orc, s.raiderRepScale, 3f);
+            Assert.AreEqual(3f, st.war.contribution, 1e-4f, "쓰러뜨린 수만큼 승률");
+            Assert.AreEqual(human + s.rivalGain * s.raiderRepScale, Rep(st, Tribe.Human), 1e-4f, "호감도는 작게");
+        }
+
+        [Test]
+        public void Breach_WithoutJoinedWar_DoesNothing()
+        {
+            var s = Settings();
+            var st = TribeLogic.CreateNew(s);
+            TribeLogic.RegisterBreach(st, s);
+            Assert.AreEqual(0, st.war.breaches);
+            Assert.AreEqual(0f, Rep(st, Tribe.Human), 1e-4f);
+        }
+
+        [Test]
+        public void RaidWaves_GrowEachTime()
+        {
+            var s = Settings();
+            Assert.AreEqual(s.raidBaseSize, TribeLogic.RaidSize(0, s));
+            Assert.Greater(TribeLogic.RaidSize(2, s), TribeLogic.RaidSize(1, s));
+        }
+
         [Test]
         public void War_StartsByChance_AfterCooldown()
         {

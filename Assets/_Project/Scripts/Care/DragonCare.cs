@@ -285,10 +285,20 @@ namespace DragonRecipe.Care
         /// 드래곤이 종족을 공격함 (공격 기능이 부른다). 바로 호감도에 반영되고, 병사들도 즉시 태도를 바꾼다.
         /// 저장은 비행이 끝날 때 한꺼번에.
         /// </summary>
-        public static void ReportTribeAttack(Tribe target)
+        /// <param name="repScale">호감도 변화 배율 (방어전 침입자는 작게)</param>
+        /// <param name="contribution">참전 중 승률 기여 (쓰러뜨린 수)</param>
+        public static void ReportTribeAttack(Tribe target, float repScale = 1f, float contribution = 1f)
         {
             if (!IsLoaded) return;
-            TribeLogic.RegisterAttack(State.tribes, TribeSettings, target);
+            TribeLogic.RegisterAttack(State.tribes, TribeSettings, target, repScale, contribution);
+            TribesChanged?.Invoke();
+        }
+
+        /// <summary>방어전: 적이 편든 쪽 마을까지 뚫고 들어옴</summary>
+        public static void ReportWarBreach()
+        {
+            if (!IsLoaded) return;
+            TribeLogic.RegisterBreach(State.tribes, TribeSettings);
             TribesChanged?.Invoke();
         }
 
@@ -334,6 +344,25 @@ namespace DragonRecipe.Care
             Save();
             TribesChanged?.Invoke();
             return true;
+        }
+
+        /// <summary>디버그: 비행 한 번이 끝난 것처럼 종족 쪽만 진행한다 (rand를 주면 승패·제물을 정할 수 있음)</summary>
+        public static TribeReport DebugTribeAfterFlight(Func<float> rand = null)
+        {
+            if (!IsLoaded) return null;
+            LastTribeReport = TribeLogic.AfterFlight(State.tribes, TribeSettings, rand ?? (() => UnityEngine.Random.value));
+            CollectOfferings();
+            Save();
+            TribesChanged?.Invoke();
+            return LastTribeReport;
+        }
+
+        /// <summary>디버그: 종족 상태를 직접 고친 뒤 저장하고 알린다</summary>
+        public static void DebugTribesEdited()
+        {
+            if (!IsLoaded) return;
+            Save();
+            TribesChanged?.Invoke();
         }
 
         /// <summary>전쟁 참여 요청을 거절한다</summary>

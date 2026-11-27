@@ -128,8 +128,36 @@ namespace DragonRecipe.Tribes
         public float joinEnemyLoss = 10f;
         [Range(0f, 1f)] public float baseWinChance = 0.5f;
         [Tooltip("참전 중 적 편을 한 번 공격할 때마다 오르는 승률")]
-        public float winChancePerAttack = 0.1f;
-        [Range(0f, 1f)] public float maxWinChance = 0.9f;
+        public float winChancePerAttack = 0.04f;
+        [Tooltip("적이 편든 쪽 마을까지 뚫고 들어올 때마다 깎이는 승률")]
+        public float breachPenalty = 0.08f;
+        [Range(0f, 1f)] public float minWinChance = 0.05f;
+        [Range(0f, 1f)] public float maxWinChance = 0.95f;
+        [Tooltip("적이 마을까지 뚫고 들어오면 편든 쪽이 잃는 호감도 (지켜 주지 못함)")]
+        public float breachRepLoss = 2f;
+
+        [Header("방어전 (참전 중 비행)")]
+        [Tooltip("비행 한 번에 몰려오는 적 무리 수")]
+        public int raidWaves = 3;
+        [Tooltip("이륙 뒤 첫 무리가 나타날 때까지 (초)")]
+        public float raidFirstDelay = 6f;
+        public float raidInterval = 25f;
+        [Tooltip("첫 무리 병사 수, 무리마다 늘어나는 수")]
+        public int raidBaseSize = 3;
+        public int raidGrowth = 2;
+        [Tooltip("편든 쪽 마을에서 이만큼 떨어진 곳(적 마을 쪽)에서 나타난다")]
+        public float raidSpawnDistance = 110f;
+        public float raidSpeed = 3.2f;
+        [Tooltip("마을 가운데에서 이 반경 안에 들어오면 뚫린 것")]
+        public float breachRadius = 14f;
+        [Tooltip("방어전 침입자를 쓰러뜨릴 때 호감도 변화 배율 (승률에는 한 명당 그대로 반영)")]
+        [Range(0f, 1f)] public float raiderRepScale = 0.25f;
+        [Tooltip("비행 한 번 동안 마을이 버티는 횟수 (방어 게이지 칸 수)")]
+        public int villageDefense = 5;
+        [Tooltip("편든 쪽 병사도 다가오는 적을 쏜다. 재장전 시간 배율 (클수록 덜 돕는다)")]
+        public float allyReloadScale = 2.2f;
+        [Tooltip("망루 높이 (참전하면 여기서 이륙)")]
+        public float watchtowerHeight = 16f;
         [Tooltip("이기면 편든 쪽이 오르는 호감도")]
         public float winGain = 25f;
         [Tooltip("지면 편든 쪽이 잃는 호감도")]
