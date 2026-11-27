@@ -113,6 +113,28 @@ namespace DragonRecipe.Tests
         }
 
         [Test]
+        public void Bank_IsHeld_AndKeepsTurning_AfterReleasingStick()
+        {
+            var m = NewHatchling(speed: 25f);
+            Run(m, 0.3f, new Vector2(1, 0));
+            float banked = m.Bank;
+            Assert.Greater(banked, 15f);
+            float yawBefore = m.Yaw;
+            Run(m, 1f, Vector2.zero);
+            Assert.AreEqual(banked, m.Bank, 0.01f, "손을 뗐는데 기울기가 수평으로 돌아감");
+            Assert.Greater(m.Yaw, yawBefore + 10f, "기울어진 채로 선회가 계속되지 않음");
+        }
+
+        [Test]
+        public void Bank_ReturnsToLevel_OnlyWithOppositeInput()
+        {
+            var m = NewHatchling(speed: 25f);
+            Run(m, 0.3f, new Vector2(1, 0));
+            Run(m, 0.3f, new Vector2(-1, 0));
+            Assert.AreEqual(0f, m.Bank, 2f);
+        }
+
+        [Test]
         public void Turning_ChangesYaw()
         {
             var m = NewHatchling();

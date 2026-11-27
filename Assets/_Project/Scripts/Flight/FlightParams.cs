@@ -35,9 +35,11 @@ namespace DragonRecipe.Flight
         public float maxPitchDown = 70f;
         [Tooltip("스틱을 끝까지 밀었을 때 기수가 돌아가는 속도 (deg/s). 손을 떼면 그 각도를 유지")]
         public float pitchResponse = 60f;
-        [Tooltip("선회 속도 (deg/s)")]
+        [Tooltip("최대 기울기일 때의 선회 속도 (deg/s)")]
         public float turnRate = 70f;
         public float maxBank = 45f;
+        [Tooltip("스틱을 끝까지 밀었을 때 몸이 기울어지는 속도 (deg/s). 손을 떼면 그 기울기를 유지")]
+        public float bankResponse = 90f;
 
         [Header("날갯짓")]
         [Tooltip("이 단계는 플레이어의 날갯짓 개입 없이는 고도를 유지할 수 없음 (UI 안내용)")]

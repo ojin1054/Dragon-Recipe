@@ -63,6 +63,8 @@ namespace DragonRecipe.Core
 
         void Update()
         {
+            if (GamePause.IsPaused) return;
+
             switch (Current)
             {
                 case State.Ready:

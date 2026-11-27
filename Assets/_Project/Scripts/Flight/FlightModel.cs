@@ -126,9 +126,11 @@ namespace DragonRecipe.Flight
             }
             Pitch = Mathf.Clamp(Pitch, -p.maxPitchDown, p.maxPitchUp);
 
-            // 선회
-            Yaw += stick.x * p.turnRate * dt;
-            Bank = Mathf.MoveTowards(Bank, stick.x * p.maxBank, 120f * dt);
+            // 선회: 스틱 좌우는 몸을 "기울이는" 입력. 손을 떼면 기울기를 유지하고,
+            // 기울어진 만큼 계속 선회한다 (수평으로 돌리려면 반대로 밀어야 함)
+            Bank += stick.x * p.bankResponse * dt;
+            Bank = Mathf.Clamp(Bank, -p.maxBank, p.maxBank);
+            Yaw += (Bank / Mathf.Max(1f, p.maxBank)) * p.turnRate * dt;
 
             // 속도: 내려가면 가속, 올라가면 감속
             float sinPitch = Mathf.Sin(Pitch * Mathf.Deg2Rad);

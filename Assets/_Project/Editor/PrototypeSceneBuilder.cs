@@ -75,7 +75,7 @@ namespace DragonRecipe.EditorTools
             camGo.transform.position = nest.position + new Vector3(0, 3.5f, -9f);
             camGo.transform.LookAt(nest.position + Vector3.forward * 6f);
 
-            BuildUI(session, dragon);
+            BuildUI(session, dragon, input);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -87,14 +87,20 @@ namespace DragonRecipe.EditorTools
 
         static DragonStageData[] CreateStages()
         {
-            var hatch = LoadOrCreate<DragonStageData>($"{DataDir}/Stage_Hatchling.asset");
+            // 이미 있는 에셋은 건드리지 않는다 (인스펙터에서 튜닝한 값 보존)
+            var hatch = LoadOrCreate<DragonStageData>($"{DataDir}/Stage_Hatchling.asset", out bool newHatch);
+            if (newHatch)
+            {
             hatch.stage = GrowthStage.Hatchling;
             hatch.displayName = "어린 드래곤";
             hatch.bodyScale = 1f;
             hatch.flight = new FlightParams(); // 기본값이 어린 드래곤 튜닝
             EditorUtility.SetDirty(hatch);
+            }
 
-            var juv = LoadOrCreate<DragonStageData>($"{DataDir}/Stage_Juvenile.asset");
+            var juv = LoadOrCreate<DragonStageData>($"{DataDir}/Stage_Juvenile.asset", out bool newJuv);
+            if (newJuv)
+            {
             juv.stage = GrowthStage.Juvenile;
             juv.displayName = "청소년 드래곤";
             juv.bodyScale = 1.5f;
@@ -104,8 +110,11 @@ namespace DragonRecipe.EditorTools
                 staminaRegen = 9f, turnRate = 65f, safeLandingSink = 5.5f, safeLandingSpeed = 19f
             };
             EditorUtility.SetDirty(juv);
+            }
 
-            var adult = LoadOrCreate<DragonStageData>($"{DataDir}/Stage_Adult.asset");
+            var adult = LoadOrCreate<DragonStageData>($"{DataDir}/Stage_Adult.asset", out bool newAdult);
+            if (newAdult)
+            {
             adult.stage = GrowthStage.Adult;
             adult.displayName = "성체 드래곤";
             adult.bodyScale = 2.2f;
@@ -116,6 +125,7 @@ namespace DragonRecipe.EditorTools
                 safeLandingSink = 7f, safeLandingSpeed = 22f
             };
             EditorUtility.SetDirty(adult);
+            }
 
             return new[] { hatch, juv, adult };
         }
@@ -140,7 +150,8 @@ namespace DragonRecipe.EditorTools
         static FoodData Food(string id, string name, int satiety, FoodTrait trait, Color color, Vector3 size,
             float wander, bool flees, float flee, float weight)
         {
-            var f = LoadOrCreate<FoodData>($"{DataDir}/Food_{id}.asset");
+            var f = LoadOrCreate<FoodData>($"{DataDir}/Food_{id}.asset", out bool created);
+            if (!created) return f; // 기존 값 보존
             f.id = id;
             f.displayName = name;
             f.satiety = satiety;
@@ -156,9 +167,10 @@ namespace DragonRecipe.EditorTools
             return f;
         }
 
-        static T LoadOrCreate<T>(string path) where T : ScriptableObject
+        static T LoadOrCreate<T>(string path, out bool created) where T : ScriptableObject
         {
             var a = AssetDatabase.LoadAssetAtPath<T>(path);
+            created = !a;
             if (a) return a;
             a = ScriptableObject.CreateInstance<T>();
             AssetDatabase.CreateAsset(a, path);
@@ -388,7 +400,7 @@ namespace DragonRecipe.EditorTools
         static Font _font;
         static Font UIFont => _font ? _font : _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
-        static void BuildUI(FlightSession session, DragonFlightController dragon)
+        static void BuildUI(FlightSession session, DragonFlightController dragon, DragonInput input)
         {
             var es = new GameObject("EventSystem");
             es.AddComponent<EventSystem>();
@@ -464,6 +476,52 @@ namespace DragonRecipe.EditorTools
             label.color = new Color(0.15f, 0.1f, 0.05f);
             result.retryButton = btn;
             resultPanel.gameObject.SetActive(false);
+
+            BuildPauseMenu(canvasGo, ct, session, input);
+        }
+
+        static void BuildPauseMenu(GameObject canvasGo, Transform ct, FlightSession session, DragonInput input)
+        {
+            var menu = canvasGo.AddComponent<PauseMenu>();
+            menu.session = session;
+            menu.input = input;
+
+            // 항상 떠 있는 일시정지 버튼 (오른쪽 위)
+            menu.pauseButton = MakeButton(ct, "PauseButton", new Vector2(1, 1), new Vector2(-80, -70), new Vector2(110, 90),
+                "II", new Color(1f, 1f, 1f, 0.35f), Color.white, out _);
+
+            // 메뉴 패널 (반투명 전체 화면 배경 + 가운데 상자)
+            var dim = MakeImage(ct, "PauseMenu", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(0, 0, 0, 0.55f));
+            Stretch(dim.rectTransform);
+            var box = MakeImage(dim.transform, "Box", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(720, 620), new Color(0.08f, 0.1f, 0.14f, 0.92f));
+            var title = MakeText(box.transform, "Title", new Vector2(0.5f, 1), new Vector2(0, -70), new Vector2(680, 90), 56, TextAnchor.MiddleCenter);
+            title.text = "일시정지";
+
+            var btnColor = new Color(1f, 0.75f, 0.35f);
+            var textColor = new Color(0.15f, 0.1f, 0.05f);
+            menu.resumeButton = MakeButton(box.transform, "Resume", new Vector2(0.5f, 0.5f), new Vector2(0, 90), new Vector2(480, 100), "계속하기", btnColor, textColor, out _);
+            menu.invertButton = MakeButton(box.transform, "InvertPitch", new Vector2(0.5f, 0.5f), new Vector2(0, -35), new Vector2(480, 100), "상/하 반전: 꺼짐", btnColor, textColor, out menu.invertLabel);
+            menu.restartButton = MakeButton(box.transform, "Restart", new Vector2(0.5f, 0.5f), new Vector2(0, -160), new Vector2(480, 100), "둥지로 돌아가기", btnColor, textColor, out _);
+            var hint = MakeText(box.transform, "Hint", new Vector2(0.5f, 0), new Vector2(0, 45), new Vector2(680, 50), 26, TextAnchor.MiddleCenter);
+            hint.text = "Esc / P / 패드 Start 로 열고 닫기";
+            hint.color = new Color(1, 1, 1, 0.6f);
+
+            menu.panel = dim.gameObject;
+            dim.gameObject.SetActive(false);
+        }
+
+        static Button MakeButton(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, string label,
+            Color color, Color textColor, out Text labelText)
+        {
+            var img = MakeImage(parent, name, anchor, pos, size, color);
+            img.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            img.type = Image.Type.Sliced;
+            var btn = img.gameObject.AddComponent<Button>();
+            btn.targetGraphic = img;
+            labelText = MakeText(img.transform, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, size - new Vector2(20, 10), 38, TextAnchor.MiddleCenter);
+            labelText.text = label;
+            labelText.color = textColor;
+            return btn;
         }
 
         static void SetControlPath(Object control, string path)
