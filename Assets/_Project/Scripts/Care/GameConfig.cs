@@ -15,6 +15,8 @@ namespace DragonRecipe.Care
         [Header("동물 농장")]
         public DragonRecipe.Farm.FarmSettings farm = new DragonRecipe.Farm.FarmSettings();
         public DragonRecipe.Farm.CombineTable combineTable;
+        [Header("종족 (사람·오크·엘프)")]
+        public DragonRecipe.Tribes.TribeSettings tribes = new DragonRecipe.Tribes.TribeSettings();
 
         public string nestScene = "Nest";
         public string flightScene = "FlightPrototype";

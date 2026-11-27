@@ -173,6 +173,7 @@ namespace DragonRecipe.Care
             s.codexForms = old.codexForms;
             s.farm = old.farm ?? new DragonRecipe.Farm.FarmState();
             DragonRecipe.Farm.FarmLogic.OnNewEgg(s.farm);
+            s.tribes = old.tribes ?? new DragonRecipe.Tribes.TribeState(); // 세상은 드래곤을 기억한다
             return s;
         }
 

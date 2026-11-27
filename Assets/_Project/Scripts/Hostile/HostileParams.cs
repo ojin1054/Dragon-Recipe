@@ -12,7 +12,8 @@ namespace DragonRecipe.Hostile
         public float keepOutRadius = 60f;
 
         [Header("사냥꾼 무리")]
-        public int hunterGroups = 6;
+        [Tooltip("종족 마을(TribeWorld)의 병사가 대신하므로 기본 0")]
+        public int hunterGroups = 0;
         public int hunterGroupMin = 3;
         public int hunterGroupMax = 6;
         [Tooltip("무리 구성원이 모여 있는 반경")]

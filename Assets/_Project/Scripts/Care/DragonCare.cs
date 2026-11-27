@@ -4,6 +4,7 @@ using DragonRecipe.Core;
 using DragonRecipe.Farm;
 using DragonRecipe.Flight;
 using DragonRecipe.Food;
+using DragonRecipe.Tribes;
 using UnityEngine;
 
 namespace DragonRecipe.Care
@@ -58,6 +59,8 @@ namespace DragonRecipe.Care
         public static event Action FarmChanged;
         /// <summary>끝난 조합을 거둠 (성공 / 실패 연출용)</summary>
         public static event Action<List<CombineResult>> CombinesCollected;
+        /// <summary>종족 호감도·제단·전쟁이 바뀜</summary>
+        public static event Action TribesChanged;
 
         public static void EnsureLoaded(GameConfig config)
         {
@@ -83,6 +86,8 @@ namespace DragonRecipe.Care
             s.farm.jobs ??= new List<CombineJob>();
             s.farm.buffs ??= new List<ActiveBuff>();
             s.farm.recipes ??= new List<RecipeRecord>();
+            s.tribes ??= TribeLogic.CreateNew(Config.tribes ?? new TribeSettings());
+            TribeLogic.Ensure(s.tribes, Config.tribes ?? new TribeSettings());
             if (s.generation <= 0) s.generation = 1;
             if (s.stage == GrowthStage.Adult && s.form == DragonForm.None)
             {
@@ -115,7 +120,8 @@ namespace DragonRecipe.Care
             if (data == null) return new FlightParams();
             Tick();
             var p = CareLogic.FlightParamsFor(data.flight, State, Config.care);
-            return FarmBuffs.Apply(p, State.farm.buffs);
+            p = FarmBuffs.Apply(p, State.farm.buffs);
+            return FarmBuffs.Apply(p, TribeLogic.Blessings(State.tribes, TribeSettings));
         }
 
         /// <summary>
@@ -172,6 +178,10 @@ namespace DragonRecipe.Care
                 FarmLogic.CountDownBuffs(State.farm);
                 FarmChanged?.Invoke();
             }
+            // 종족: 호감도가 조금 돌아가고, 제물이 오고, 전쟁이 진행된다
+            LastTribeReport = TribeLogic.AfterFlight(State.tribes, TribeSettings, () => UnityEngine.Random.value);
+            CollectOfferings();
+            TribesChanged?.Invoke();
             LastFlightReport = report;
             Save();
 
@@ -263,6 +273,78 @@ namespace DragonRecipe.Care
             return true;
         }
 
+        // ───────────── 종족 ─────────────
+
+        public static TribeState Tribes => State?.tribes;
+        public static TribeSettings TribeSettings => Config && Config.tribes != null ? Config.tribes : _defaultTribes ??= new TribeSettings();
+        static TribeSettings _defaultTribes;
+        /// <summary>마지막 비행 뒤 종족 쪽에서 일어난 일</summary>
+        public static TribeReport LastTribeReport { get; private set; }
+
+        /// <summary>
+        /// 드래곤이 종족을 공격함 (공격 기능이 부른다). 바로 호감도에 반영되고, 병사들도 즉시 태도를 바꾼다.
+        /// 저장은 비행이 끝날 때 한꺼번에.
+        /// </summary>
+        public static void ReportTribeAttack(Tribe target)
+        {
+            if (!IsLoaded) return;
+            TribeLogic.RegisterAttack(State.tribes, TribeSettings, target);
+            TribesChanged?.Invoke();
+        }
+
+        /// <summary>엘프 땅에서 먹이를 사냥함</summary>
+        public static void ReportElfLandHunt()
+        {
+            if (!IsLoaded) return;
+            TribeLogic.RegisterElfLandHunt(State.tribes, TribeSettings);
+            TribesChanged?.Invoke();
+        }
+
+        /// <summary>제단의 제물을 창고로 옮긴다 (창고에 자리가 있는 만큼). 옮긴 수</summary>
+        public static int CollectOfferings()
+        {
+            if (!IsLoaded || State.tribes.altar.Count == 0) return 0;
+            int moved = 0;
+            for (int i = 0; i < State.tribes.altar.Count;)
+            {
+                var o = State.tribes.altar[i];
+                var food = FindFood(o.foodId);
+                if (!food)
+                {
+                    State.tribes.altar.RemoveAt(i); // 없는 먹이 id는 버린다
+                    continue;
+                }
+                float satiety = food.satiety * (o.rare ? 2f : 1f) /* 희귀 = 포만도 2배 */;
+                if (!CareLogic.Store(State, Config.care, food.id, satiety, food.trait, o.rare)) break;
+                State.tribes.altar.RemoveAt(i);
+                moved++;
+            }
+            if (moved > 0)
+            {
+                Save();
+                TribesChanged?.Invoke();
+            }
+            return moved;
+        }
+
+        /// <summary>전쟁 참여 요청에 답한다: 한쪽 편으로 참전</summary>
+        public static bool JoinWar(Tribe side)
+        {
+            if (!IsLoaded || !TribeLogic.JoinWar(State.tribes, TribeSettings, side)) return false;
+            Save();
+            TribesChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>전쟁 참여 요청을 거절한다</summary>
+        public static bool DeclineWar()
+        {
+            if (!IsLoaded || !TribeLogic.DeclineWar(State.tribes, TribeSettings)) return false;
+            Save();
+            TribesChanged?.Invoke();
+            return true;
+        }
+
         /// <summary>성체가 된 뒤 새 알을 부화시킨다 (도감은 이어짐)</summary>
         public static bool HatchNewEgg()
         {
@@ -282,6 +364,7 @@ namespace DragonRecipe.Care
             SaveSystem.Delete();
             State = Config != null ? DragonState.CreateNew(Config.care, Clock()) : null;
             LastFlightReport = null;
+            if (State != null) TribeLogic.Ensure(State.tribes, TribeSettings);
             Save();
         }
 
@@ -308,6 +391,8 @@ namespace DragonRecipe.Care
             Hatched = null;
             FarmChanged = null;
             CombinesCollected = null;
+            TribesChanged = null;
+            LastTribeReport = null;
             Clock = () => DateTime.UtcNow;
         }
 

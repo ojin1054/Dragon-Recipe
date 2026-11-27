@@ -87,6 +87,9 @@ namespace DragonRecipe.Care
         /// <summary>둥지 동물 농장. 새 알을 부화시켜도 이어진다 (버프만 사라짐)</summary>
         public DragonRecipe.Farm.FarmState farm = new DragonRecipe.Farm.FarmState();
 
+        /// <summary>사람·오크·엘프와의 관계 (호감도, 제단, 전쟁). 새 알을 부화시켜도 이어진다</summary>
+        public DragonRecipe.Tribes.TribeState tribes = new DragonRecipe.Tribes.TribeState();
+
         public static DragonState CreateNew(CareSettings s, DateTime nowUtc) => new DragonState
         {
             hunger = s.startingHunger,
