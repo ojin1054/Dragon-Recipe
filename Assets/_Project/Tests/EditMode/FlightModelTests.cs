@@ -175,5 +175,63 @@ namespace DragonRecipe.Tests
             Assert.Greater(lowFast, highSlow);
             Assert.Greater(FlightRules.SnatchMultiplier(lowFast), FlightRules.SnatchMultiplier(highSlow));
         }
+
+        // ── 이륙 힘 모으기 ──
+
+        [Test]
+        public void ChargeLevel_FillsThenDrains_WhenHeldTooLong()
+        {
+            var p = new FlightParams { launchChargeTime = 1f };
+            Assert.AreEqual(0f, FlightModel.ChargeLevel(0f, p), 1e-4f);
+            Assert.AreEqual(0.5f, FlightModel.ChargeLevel(0.5f, p), 1e-4f);
+            Assert.AreEqual(1f, FlightModel.ChargeLevel(1f, p), 1e-4f);
+            Assert.AreEqual(0.7f, FlightModel.ChargeLevel(1.3f, p), 1e-4f, "가득 찬 뒤 계속 누르면 줄어들어야 함");
+        }
+
+        [Test]
+        public void PerfectCharge_OnlyNearFull()
+        {
+            var p = new FlightParams { launchPerfectWindow = 0.1f };
+            Assert.IsTrue(FlightModel.IsPerfectCharge(0.95f, p));
+            Assert.IsFalse(FlightModel.IsPerfectCharge(0.8f, p));
+        }
+
+        static float LaunchAndMeasure(float charge, bool perfect, out float speed)
+        {
+            var m = new FlightModel(new FlightParams());
+            m.Launch(new Vector3(0, 10f, 0), 0f, charge, perfect);
+            speed = m.Speed;
+            float maxY = m.Position.y;
+            for (float t = 0; t < 3f; t += Dt)
+            {
+                m.Step(Dt, Vector2.zero);
+                maxY = Mathf.Max(maxY, m.Position.y);
+            }
+            return maxY;
+        }
+
+        [Test]
+        public void ChargedLaunch_IsFasterAndHigherThanTap()
+        {
+            float tapY = LaunchAndMeasure(0f, false, out float tapSpeed);
+            float fullY = LaunchAndMeasure(1f, false, out float fullSpeed);
+            float perfectY = LaunchAndMeasure(1f, true, out float perfectSpeed);
+
+            Assert.Greater(fullSpeed, tapSpeed);
+            Assert.Greater(fullY, tapY + 3f, "힘을 모으면 확실히 더 높이 올라가야 함");
+            Assert.Greater(perfectSpeed, fullSpeed);
+            Assert.Greater(perfectY, fullY);
+        }
+
+        [Test]
+        public void TapLaunch_MatchesOldBehaviour()
+        {
+            var p = new FlightParams();
+            var m = new FlightModel(p);
+            m.Launch(Vector3.zero, 0f, 0f, false);
+            Assert.AreEqual(p.launchSpeed, m.Speed, 1e-4f);
+            Assert.AreEqual(p.launchRise, m.VerticalSpeed, 1e-4f);
+            Assert.AreEqual(0f, m.Pitch, 1e-4f);
+        }
     }
 }

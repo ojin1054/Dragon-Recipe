@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f3f2332cca60b4146ac79de1ac0a76e6, type: 3}
+  m_Name: UIIconSet
+  m_EditorClassIdentifier: DragonRecipe.Runtime::DragonRecipe.UI.UIIconSet
+  faceHappy: {fileID: 21300000, guid: 612fa79cba24e58489b3b3ec1fd1897b, type: 3}
+  faceHungry: {fileID: 21300000, guid: c3e325c9ebb7b4346aa7df3ae96917ef, type: 3}
+  faceStarving: {fileID: 21300000, guid: 46cb8cdc94729a849b778cf413f09fa2, type: 3}
+  faceFull: {fileID: 21300000, guid: 409d04a403b4d18479d70305f3b2812f, type: 3}
+  meat: {fileID: 21300000, guid: 6a2c23d58b94e2b4e96e876893f3f4ae, type: 3}
+  sprout: {fileID: 21300000, guid: bd266ad1d61998b4b9255cf556879714, type: 3}
+  no: {fileID: 21300000, guid: 19c444b556af4854eb517d1f80dd7f47, type: 3}
+  trash: {fileID: 21300000, guid: 06e3fb9e7bbd815428f2a0872516122c, type: 3}
+  bandage: {fileID: 21300000, guid: 80938c32d3efd5b41a771af058e3d5cc, type: 3}
+  potion: {fileID: 21300000, guid: 8ca9882458d4323439e5b2cff565434b, type: 3}
+  star: {fileID: 21300000, guid: db75882655e17014287d977a8693995a, type: 3}
+  boom: {fileID: 21300000, guid: e75d0b3707d45814d8f1c990ac15e9b6, type: 3}
+  check: {fileID: 21300000, guid: 990ad69527b44644eb4b68d1f7eeaa52, type: 3}
+  clock: {fileID: 21300000, guid: b965f7d79ea5fd0449dfbe29c60bcc07, type: 3}
+  wind: {fileID: 21300000, guid: 60e7f260e67162245b83c38b94e6e667, type: 3}
+  sparkle: {fileID: 21300000, guid: 9511f5b24653640478c2ba5daf80858b, type: 3}
+  target: {fileID: 21300000, guid: e54f7add6d405064d8bc2d234bf29de4, type: 3}
+  wing: {fileID: 21300000, guid: 9f7cf6f0d6e9cf84cbd3ef132a7b8f62, type: 3}
+  arrowRight: {fileID: 21300000, guid: b641a148493e2024ca5380abb5cfa162, type: 3}
+  arrowDown: {fileID: 21300000, guid: 826366e9c811e5743a3c360d54c3bed4, type: 3}

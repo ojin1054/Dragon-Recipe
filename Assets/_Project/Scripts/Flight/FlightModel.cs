@@ -68,6 +68,26 @@ namespace DragonRecipe.Flight
             _lastFlapTime = float.NegativeInfinity;
         }
 
+        /// <summary>
+        /// 힘을 모은 만큼 도약한다. charge 0 = 그냥 출발, 1 = 더 빠르게, 기수를 든 채 높이 뛰어오름.
+        /// </summary>
+        public void Launch(Vector3 position, float yaw, float charge, bool perfect)
+        {
+            var p = Params;
+            charge = Mathf.Clamp01(charge);
+            float bonus = perfect ? p.launchPerfectBonus : 1f;
+            Reset(position, yaw, Mathf.Min(Mathf.Lerp(p.launchSpeed, p.launchMaxSpeed, charge) * bonus, p.maxSpeed));
+            Pitch = Mathf.Clamp(Mathf.Lerp(0f, p.launchMaxPitch, charge), -p.maxPitchDown, p.maxPitchUp);
+            VerticalSpeed = Mathf.Min(Mathf.Lerp(p.launchRise, p.launchMaxRise, charge) * bonus, p.maxRiseSpeed);
+        }
+
+        /// <summary>버튼을 누르고 있던 시간 → 도약 게이지 (0~1). 가득 찬 뒤에도 누르고 있으면 다시 줄어든다</summary>
+        public static float ChargeLevel(float heldTime, FlightParams p)
+            => Mathf.PingPong(Mathf.Max(0f, heldTime) / Mathf.Max(0.01f, p.launchChargeTime), 1f);
+
+        public static bool IsPerfectCharge(float level, FlightParams p)
+            => level >= 1f - p.launchPerfectWindow;
+
         /// <summary>현재 속도에서 중력을 상쇄하는 비율 (0~1)</summary>
         public float LiftFraction(float speed)
         {

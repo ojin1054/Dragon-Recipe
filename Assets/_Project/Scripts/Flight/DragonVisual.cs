@@ -23,12 +23,22 @@ namespace DragonRecipe.Flight
 
         void OnEnable()
         {
-            if (controller) controller.Flapped += OnFlapped;
+            if (!controller) return;
+            controller.Flapped += OnFlapped;
+            controller.Launched += OnLaunched;
         }
 
         void OnDisable()
         {
-            if (controller) controller.Flapped -= OnFlapped;
+            if (!controller) return;
+            controller.Flapped -= OnFlapped;
+            controller.Launched -= OnLaunched;
+        }
+
+        void OnLaunched(float charge, bool perfect)
+        {
+            _flapT = 0f;
+            _flapStrength = perfect ? 1.5f : Mathf.Lerp(0.8f, 1.3f, charge); // 힘을 모은 만큼 크게 내려친다
         }
 
         void OnFlapped(FlapOutcome outcome)
@@ -47,7 +57,14 @@ namespace DragonRecipe.Flight
         {
             float target;
             bool flying = controller && controller.IsFlying;
-            if (!flying)
+            if (!flying && controller && controller.IsCharging)
+            {
+                // 힘을 모을수록 날개를 치켜든다. 가득 차면 부르르 떨림
+                float c = controller.Charge;
+                target = Mathf.Lerp(foldedAngle, flapUpAngle + 15f, c);
+                if (controller.ChargeIsPerfect) target += Mathf.Sin(Time.time * 60f) * 4f;
+            }
+            else if (!flying)
             {
                 target = foldedAngle;
             }

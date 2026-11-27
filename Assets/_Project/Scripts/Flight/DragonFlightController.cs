@@ -22,12 +22,21 @@ namespace DragonRecipe.Flight
         /// <summary>바로 아래 지면까지 거리 (m)</summary>
         public float Altitude { get; private set; }
 
+        /// <summary>이륙 전, 날갯짓 버튼을 누른 채 힘을 모으는 중</summary>
+        public bool IsCharging { get; private set; }
+        /// <summary>도약 게이지 (0~1)</summary>
+        public float Charge => IsCharging ? FlightModel.ChargeLevel(_chargeTime, Model.Params) : 0f;
+        public bool ChargeIsPerfect => IsCharging && FlightModel.IsPerfectCharge(Charge, Model.Params);
+
         public event Action<FlapOutcome> Flapped;
+        /// <summary>(게이지, 완벽한 도약 여부)</summary>
+        public event Action<float, bool> Launched;
         /// <summary>(종류, 충돌 시 속도)</summary>
         public event Action<ImpactType, Vector3> Impacted;
 
         Rigidbody _rb;
         bool _flapRequested;
+        float _chargeTime;
 
         void Awake()
         {
@@ -52,6 +61,7 @@ namespace DragonRecipe.Flight
         public void Park(Vector3 position, float yaw)
         {
             IsFlying = false;
+            IsCharging = false;
             Model.Reset(position, yaw, 0f);
             _rb.position = position;
             _rb.rotation = Quaternion.Euler(0, yaw, 0);
@@ -59,12 +69,31 @@ namespace DragonRecipe.Flight
             UpdateAltitude();
         }
 
-        public void Launch()
+        /// <summary>둥지에서 웅크리고 힘을 모으기 시작</summary>
+        public void BeginCharge()
         {
-            Model.Reset(transform.position, Model.Yaw, Model.Params.launchSpeed);
-            Model.VerticalSpeed = 2f; // 둥지에서 뛰어오르는 느낌
+            if (IsFlying) return;
+            IsCharging = true;
+            _chargeTime = 0f;
+        }
+
+        public void TickCharge(float dt)
+        {
+            if (IsCharging) _chargeTime += dt;
+        }
+
+        /// <summary>힘을 모으지 않고 바로 출발</summary>
+        public void Launch() => Launch(0f, false);
+
+        /// <param name="charge">도약 게이지 (0~1)</param>
+        /// <param name="perfect">게이지가 가득 찬 순간에 뗐는지</param>
+        public void Launch(float charge, bool perfect)
+        {
+            Model.Launch(transform.position, Model.Yaw, charge, perfect);
+            IsCharging = false;
             IsFlying = true;
             input?.ConsumeFlap();
+            Launched?.Invoke(charge, perfect);
         }
 
         void Update()

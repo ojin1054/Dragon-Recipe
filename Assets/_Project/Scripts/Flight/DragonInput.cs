@@ -46,6 +46,9 @@ namespace DragonRecipe.Flight
             }
         }
 
+        /// <summary>날갯짓 버튼을 지금 누르고 있는지 (이륙 힘 모으기용)</summary>
+        public bool FlapHeld => !GamePause.IsPaused && _flap != null && _flap.IsPressed();
+
         /// <summary>마지막 호출 이후 날갯짓 버튼이 눌렸는지 (한 번 읽으면 지워짐)</summary>
         public bool ConsumeFlap()
         {

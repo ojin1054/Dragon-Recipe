@@ -28,7 +28,24 @@ namespace DragonRecipe.Flight
         [Tooltip("이 속도 아래로 떨어지면 실속: 양력이 급감하고 기수가 내려간다")]
         public float stallSpeed = 8f;
         public float maxSpeed = 40f;
+
+        [Header("이륙 (힘 모으기)")]
+        [Tooltip("힘을 모으지 않고 바로 뗐을 때의 출발 속도")]
         public float launchSpeed = 12f;
+        [Tooltip("힘을 가득 모았을 때의 출발 속도")]
+        public float launchMaxSpeed = 24f;
+        [Tooltip("바로 뗐을 때 뛰어오르는 수직 속도")]
+        public float launchRise = 2f;
+        [Tooltip("가득 모았을 때 뛰어오르는 수직 속도 (maxRiseSpeed를 넘지 않음)")]
+        public float launchMaxRise = 7f;
+        [Tooltip("가득 모았을 때 출발 기수 각도 (deg). 속도를 높이로 바꿔 준다")]
+        public float launchMaxPitch = 20f;
+        [Tooltip("게이지가 0 → 가득까지 차는 시간 (초). 계속 누르고 있으면 다시 줄어든다")]
+        public float launchChargeTime = 0.9f;
+        [Tooltip("게이지가 (1 - 이 값) 이상일 때 떼면 '완벽한 도약'")]
+        public float launchPerfectWindow = 0.12f;
+        [Tooltip("완벽한 도약일 때 출발 속도/상승 배율")]
+        public float launchPerfectBonus = 1.2f;
 
         [Header("조종")]
         public float maxPitchUp = 35f;
