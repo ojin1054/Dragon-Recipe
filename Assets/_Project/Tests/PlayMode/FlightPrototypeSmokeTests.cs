@@ -32,6 +32,23 @@ namespace DragonRecipe.Tests
             GamePause.Set(false);
         }
 
+        /// <summary>연타로 절벽 끝 근처까지 달린 뒤 도약 (Launch는 private이라 리플렉션)</summary>
+        static IEnumerator RunToEdgeAndLaunch(FlightSession session)
+        {
+            float t = 0f;
+            while (session.Current == FlightSession.State.Ready && t < 10f)
+            {
+                var run = session.dragon.RunUp;
+                if (run == null || run.Remaining <= 1f) break;
+                run.Tap(session.dragon.Model.Params);
+                t += Time.deltaTime;
+                yield return null;
+            }
+            if (session.Current == FlightSession.State.Ready)
+                typeof(FlightSession).GetMethod("Launch", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                    .Invoke(session, null);
+        }
+
         [UnityTest]
         public IEnumerator Scene_FullFlightLoop_EndsWithResult()
         {
@@ -49,11 +66,9 @@ namespace DragonRecipe.Tests
             FlightResult ended = null;
             GameEvents.FlightEnded += r => ended = r;
 
-            // 이륙 (Launch는 private이므로 SendMessage 대신 리플렉션)
-            typeof(FlightSession).GetMethod("Launch", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .Invoke(session, null);
-            Assert.AreEqual(FlightSession.State.Flying, session.Current);
             float startY = session.dragon.transform.position.y;
+            yield return RunToEdgeAndLaunch(session);
+            Assert.AreEqual(FlightSession.State.Flying, session.Current);
 
             float t = 0f;
             while (ended == null && t < 40f)
@@ -92,8 +107,7 @@ namespace DragonRecipe.Tests
             var menu = Object.FindFirstObjectByType<DragonRecipe.UI.PauseMenu>();
             Assert.IsNotNull(menu, "PauseMenu 없음");
 
-            typeof(FlightSession).GetMethod("Launch", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .Invoke(session, null);
+            yield return RunToEdgeAndLaunch(session);
             yield return new WaitForSeconds(0.3f);
 
             GamePause.Set(true);

@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 namespace DragonRecipe.Flight
 {
     /// <summary>
-    /// 키보드(WASD/방향키 + Space, Esc/P), 게임패드(왼쪽 스틱 + A, Start),
+    /// 키보드(WASD/방향키 + Space, Shift/C, Esc/P), 게임패드(왼쪽 스틱 + A, B/RT, Start),
     /// 모바일 화면 조이스틱/버튼(OnScreenStick/Button → 가상 게임패드)을 한 번에 받는다.
     /// </summary>
     public class DragonInput : MonoBehaviour
@@ -15,6 +15,7 @@ namespace DragonRecipe.Flight
 
         InputAction _move;
         InputAction _flap;
+        InputAction _crouch;
         InputAction _pause;
         bool _flapBuffered;
 
@@ -46,8 +47,8 @@ namespace DragonRecipe.Flight
             }
         }
 
-        /// <summary>날갯짓 버튼을 지금 누르고 있는지 (이륙 힘 모으기용)</summary>
-        public bool FlapHeld => !GamePause.IsPaused && _flap != null && _flap.IsPressed();
+        /// <summary>웅크리기 버튼(이륙 전용)을 지금 누르고 있는지</summary>
+        public bool CrouchHeld => !GamePause.IsPaused && _crouch != null && _crouch.IsPressed();
 
         /// <summary>마지막 호출 이후 날갯짓 버튼이 눌렸는지 (한 번 읽으면 지워짐)</summary>
         public bool ConsumeFlap()
@@ -76,6 +77,12 @@ namespace DragonRecipe.Flight
                 if (!GamePause.IsPaused) _flapBuffered = true; // 일시정지 중 누른 건 재개 후에 터지지 않게
             };
 
+            _crouch = new InputAction("Crouch", InputActionType.Button);
+            _crouch.AddBinding("<Keyboard>/leftShift");
+            _crouch.AddBinding("<Keyboard>/c");
+            _crouch.AddBinding("<Gamepad>/buttonEast");
+            _crouch.AddBinding("<Gamepad>/rightTrigger");
+
             _pause = new InputAction("Pause", InputActionType.Button);
             _pause.AddBinding("<Keyboard>/escape");
             _pause.AddBinding("<Keyboard>/p");
@@ -87,6 +94,7 @@ namespace DragonRecipe.Flight
         {
             _move.Enable();
             _flap.Enable();
+            _crouch.Enable();
             _pause.Enable();
         }
 
@@ -94,6 +102,7 @@ namespace DragonRecipe.Flight
         {
             _move.Disable();
             _flap.Disable();
+            _crouch.Disable();
             _pause.Disable();
             _flapBuffered = false;
         }
@@ -102,6 +111,7 @@ namespace DragonRecipe.Flight
         {
             _move.Dispose();
             _flap.Dispose();
+            _crouch.Dispose();
             _pause.Dispose();
         }
     }

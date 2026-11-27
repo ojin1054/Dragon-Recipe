@@ -34,6 +34,7 @@ namespace DragonRecipe.Flight
         /// <summary>양력 부족/날갯짓으로 생기는 추가 수직 속도 (m/s)</summary>
         public float VerticalSpeed;
         public float Stamina;
+        public float Health;
         public float Time { get; private set; }
         public int PerfectFlapCount { get; private set; }
 
@@ -52,6 +53,7 @@ namespace DragonRecipe.Flight
         public Vector3 Velocity => Forward * Speed + Vector3.up * VerticalSpeed;
         public Quaternion Rotation => Quaternion.Euler(-Pitch, Yaw, -Bank);
         public bool IsStalling => Speed < Params.stallSpeed;
+        public bool IsDead => Health <= 0f;
         public float TimeSinceLastFlap => Time - _lastFlapTime;
 
         public void Reset(Vector3 position, float yaw, float speed)
@@ -63,30 +65,34 @@ namespace DragonRecipe.Flight
             Speed = speed;
             VerticalSpeed = 0f;
             Stamina = Params.maxStamina;
+            Health = Params.maxHealth;
             Time = 0f;
             PerfectFlapCount = 0;
             _lastFlapTime = float.NegativeInfinity;
         }
 
         /// <summary>
-        /// 힘을 모은 만큼 도약한다. charge 0 = 그냥 출발, 1 = 더 빠르게, 기수를 든 채 높이 뛰어오름.
+        /// 절벽에서 도약한다. 달리기 파워 → 출발 속도, 웅크리기 판정 → 상승 속도와 기수 각도.
         /// </summary>
-        public void Launch(Vector3 position, float yaw, float charge, bool perfect)
+        public void Launch(Vector3 position, float yaw, LaunchPlan plan)
         {
             var p = Params;
-            charge = Mathf.Clamp01(charge);
-            float bonus = perfect ? p.launchPerfectBonus : 1f;
-            Reset(position, yaw, Mathf.Min(Mathf.Lerp(p.launchSpeed, p.launchMaxSpeed, charge) * bonus, p.maxSpeed));
-            Pitch = Mathf.Clamp(Mathf.Lerp(0f, p.launchMaxPitch, charge), -p.maxPitchDown, p.maxPitchUp);
-            VerticalSpeed = Mathf.Min(Mathf.Lerp(p.launchRise, p.launchMaxRise, charge) * bonus, p.maxRiseSpeed);
+            float speed = Mathf.Min(Mathf.Lerp(p.launchSpeed, p.launchMaxSpeed, Mathf.Clamp01(plan.power)), p.maxSpeed);
+            Reset(position, yaw, speed);
+
+            if (plan.grade == LaunchGrade.Stumble)
+            {
+                // 발을 헛디뎌 고꾸라짐: 속도는 남지만 높이는 없다
+                Pitch = Mathf.Clamp(p.stumblePitch, -p.maxPitchDown, p.maxPitchUp);
+                VerticalSpeed = 0f;
+                return;
+            }
+
+            float h = Mathf.Clamp01(plan.height);
+            float bonus = plan.grade == LaunchGrade.Perfect ? p.launchPerfectBonus : 1f;
+            Pitch = Mathf.Clamp(Mathf.Lerp(0f, p.launchMaxPitch, h) * bonus, -p.maxPitchDown, p.maxPitchUp);
+            VerticalSpeed = Mathf.Min(Mathf.Lerp(p.launchRise, p.launchMaxRise, h), p.maxRiseSpeed);
         }
-
-        /// <summary>버튼을 누르고 있던 시간 → 도약 게이지 (0~1). 가득 찬 뒤에도 누르고 있으면 다시 줄어든다</summary>
-        public static float ChargeLevel(float heldTime, FlightParams p)
-            => Mathf.PingPong(Mathf.Max(0f, heldTime) / Mathf.Max(0.01f, p.launchChargeTime), 1f);
-
-        public static bool IsPerfectCharge(float level, FlightParams p)
-            => level >= 1f - p.launchPerfectWindow;
 
         /// <summary>현재 속도에서 중력을 상쇄하는 비율 (0~1)</summary>
         public float LiftFraction(float speed)
@@ -128,6 +134,31 @@ namespace DragonRecipe.Flight
             Speed = Mathf.Min(Speed + Params.flapThrust * eff, Params.maxSpeed);
             if (outcome == FlapOutcome.Perfect) PerfectFlapCount++;
             return outcome;
+        }
+
+        /// <summary>지면에 닿는 순간의 피해. 받은 피해량을 돌려준다</summary>
+        public float TakeGroundImpact(Vector3 velocity, Vector3 surfaceNormal)
+        {
+            float damage = FlightRules.GroundImpactDamage(velocity, surfaceNormal, Params);
+            Health = Mathf.Max(0f, Health - damage);
+            return damage;
+        }
+
+        /// <summary>지면에 닿는 순간: 닿는 각도가 클수록 속도를 크게 잃는다. 충격 세기(0~1)를 돌려준다</summary>
+        public float Touchdown(Vector3 velocity, Vector3 surfaceNormal)
+        {
+            float angle = FlightRules.ImpactAngle(velocity, surfaceNormal);
+            Speed = Mathf.Max(Params.minSpeed, Speed * (1f - FlightRules.TouchdownSpeedLoss(angle, Params)));
+            return FlightRules.TouchdownStrength(angle, Params);
+        }
+
+        /// <summary>지면에 닿아 미끄러지는 중: 파고들지 않게 하고 마찰로 감속</summary>
+        public void Skid(float dt)
+        {
+            if (VerticalSpeed < 0f) VerticalSpeed = 0f;
+            if (Pitch < 0f) Pitch = 0f;
+            Speed = Mathf.Max(Params.minSpeed, Speed - Params.groundFriction * dt);
+            Health = Mathf.Max(0f, Health - Params.skidDamagePerSecond * dt);
         }
 
         /// <param name="stick">x = 선회, y = 기수 (+ 위)</param>

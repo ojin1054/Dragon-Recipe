@@ -31,6 +31,9 @@ namespace DragonRecipe.EditorTools
         const string NestScenePath = Root + "/Scenes/Nest.unity";
 
         const float CliffHeight = 24f;
+        /// <summary>비행 씬: 절벽 끝(도약 지점)의 z, 둥지에서 절벽 끝까지 도움닫기 거리</summary>
+        const float CliffEdgeZ = 6f;
+        const float RunUpLength = 28f;
 
         [MenuItem("Dragon Recipe/Build All Scenes")]
         public static void Build()
@@ -49,9 +52,11 @@ namespace DragonRecipe.EditorTools
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             BuildLighting();
-            BuildWorld(mats);
+            BuildWorld(mats, stages[0].flight);
             var nest = new GameObject("Nest").transform;
-            nest.position = new Vector3(0, CliffHeight + 1.2f, 0);
+            nest.position = new Vector3(0, CliffHeight + 1.2f, CliffEdgeZ - RunUpLength);
+            var edge = new GameObject("LaunchEdge").transform;
+            edge.position = new Vector3(0, CliffHeight + 1.2f, CliffEdgeZ);
 
             var dragon = BuildDragon(stages[0], mats, out var input, out var snatch);
             dragon.transform.position = nest.position;
@@ -69,6 +74,7 @@ namespace DragonRecipe.EditorTools
             session.snatchZone = snatch;
             session.spawner = spawner;
             session.nest = nest;
+            session.launchEdge = edge;
 
             var bridge = sessionGo.AddComponent<FlightCareBridge>();
             bridge.config = config;
@@ -407,6 +413,8 @@ namespace DragonRecipe.EditorTools
             public readonly Material DragonWing = Mat("DragonWing", new Color(0.85f, 0.55f, 0.35f));
             public readonly Material DragonEye = Mat("DragonEye", new Color(1f, 0.9f, 0.2f));
             public readonly Material Prey = Mat("Prey", Color.white);
+            public readonly Material JumpZone = Mat("JumpZone", new Color(1f, 0.8f, 0.25f));
+            public readonly Material JumpLine = Mat("JumpLine", new Color(1f, 1f, 0.95f));
 
             static Material Mat(string name, Color c)
             {
@@ -450,7 +458,7 @@ namespace DragonRecipe.EditorTools
             RenderSettings.fogEndDistance = 600f;
         }
 
-        static void BuildWorld(Mats mats)
+        static void BuildWorld(Mats mats, FlightParams launch)
         {
             var world = new GameObject("World").transform;
 
@@ -460,12 +468,21 @@ namespace DragonRecipe.EditorTools
             ground.transform.localScale = new Vector3(100, 1, 100); // 1km x 1km
             ground.GetComponent<Renderer>().sharedMaterial = mats.Grass;
 
-            // 출발 절벽 + 둥지
-            var cliff = Prim(PrimitiveType.Cube, "Cliff", world, new Vector3(0, CliffHeight * 0.5f, -2f),
-                new Vector3(14, CliffHeight, 16), mats.Rock);
-            cliff.transform.rotation = Quaternion.Euler(0, 8, 0);
-            Prim(PrimitiveType.Cylinder, "NestRing", world, new Vector3(0, CliffHeight + 0.15f, 0),
+            // 출발 절벽: 둥지 → 도움닫기 길 → 절벽 끝 (+z 방향)
+            const float back = 8f; // 둥지 뒤 여유
+            float cliffLength = RunUpLength + back;
+            Prim(PrimitiveType.Cube, "Cliff", world, new Vector3(0, CliffHeight * 0.5f, CliffEdgeZ - cliffLength * 0.5f),
+                new Vector3(14, CliffHeight, cliffLength), mats.Rock);
+            Prim(PrimitiveType.Cylinder, "NestRing", world, new Vector3(0, CliffHeight + 0.15f, CliffEdgeZ - RunUpLength),
                 new Vector3(4f, 0.3f, 4f), mats.Nest, keepCollider: false);
+
+            // 도약 구간 (노란 띠) + 절벽 끝 흰 선 (완벽 거리)
+            float zone = launch.jumpZoneLength;
+            Prim(PrimitiveType.Cube, "JumpZone", world, new Vector3(0, CliffHeight + 0.03f, CliffEdgeZ - zone * 0.5f),
+                new Vector3(4f, 0.04f, zone), mats.JumpZone, keepCollider: false);
+            float line = launch.perfectJumpDistance;
+            Prim(PrimitiveType.Cube, "JumpLine", world, new Vector3(0, CliffHeight + 0.05f, CliffEdgeZ - line * 0.5f),
+                new Vector3(4f, 0.05f, line), mats.JumpLine, keepCollider: false);
 
             // 연못 (장식, 콜라이더 없음)
             Prim(PrimitiveType.Cylinder, "Pond", world, new Vector3(-40, 0.02f, 140), new Vector3(40, 0.02f, 30), mats.Water, keepCollider: false);
@@ -578,6 +595,7 @@ namespace DragonRecipe.EditorTools
             sphere.radius = 1.6f;
             snatch = snatchGo.AddComponent<SnatchZone>();
 
+            root.AddComponent<GroundImpactFx>().controller = ctrl; // [임시] 지면에 닿을 때 흙 튐
             var visual = root.AddComponent<DragonVisual>();
             visual.controller = ctrl;
             visual.leftWing = wingL;
@@ -670,7 +688,15 @@ namespace DragonRecipe.EditorTools
             flapBtn.sprite = stickBg.sprite;
             var onBtn = flapBtn.gameObject.AddComponent<OnScreenButton>();
             SetControlPath(onBtn, "<Gamepad>/buttonSouth");
-            MakeText(flapBtn.transform, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(220, 80), 40, TextAnchor.MiddleCenter).text = "날갯짓";
+            hud.flapButtonLabel = MakeText(flapBtn.transform, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(220, 80), 40, TextAnchor.MiddleCenter);
+            hud.flapButtonLabel.text = "날갯짓";
+
+            // 웅크리기 버튼 (이륙 전에만 보임): 날갯짓 버튼 바로 위
+            var crouchBtn = MakeImage(mobile.transform, "CrouchButton", new Vector2(1, 0), new Vector2(-240, 480), new Vector2(200, 200), new Color(1f, 0.85f, 0.3f, 0.5f));
+            crouchBtn.sprite = stickBg.sprite;
+            SetControlPath(crouchBtn.gameObject.AddComponent<OnScreenButton>(), "<Gamepad>/buttonEast");
+            MakeText(crouchBtn.transform, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 80), 34, TextAnchor.MiddleCenter).text = "웅크리기";
+            hud.crouchButton = crouchBtn.gameObject;
 
             var vis = canvasGo.AddComponent<MobileControlsVisibility>();
             vis.controlsRoot = mobile;
