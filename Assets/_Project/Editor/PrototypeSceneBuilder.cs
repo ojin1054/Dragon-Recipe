@@ -34,6 +34,8 @@ namespace DragonRecipe.EditorTools
         /// <summary>비행 씬: 절벽 끝(도약 지점)의 z, 둥지에서 절벽 끝까지 도움닫기 거리</summary>
         const float CliffEdgeZ = 6f;
         const float RunUpLength = 28f;
+        /// <summary>비행 씬: 둥지에서 동굴 입구까지 거리</summary>
+        const float CaveMouthAhead = 5f;
 
         [MenuItem("Dragon Recipe/Build All Scenes")]
         public static void Build()
@@ -204,6 +206,9 @@ namespace DragonRecipe.EditorTools
             Prim(PrimitiveType.Cube, "Cliff", world, new Vector3(0, CliffHeight * 0.5f, -2f), new Vector3(14, CliffHeight, 16), mats.Rock)
                 .transform.rotation = Quaternion.Euler(0, 8, 0);
             Prim(PrimitiveType.Cylinder, "NestRing", world, new Vector3(0, CliffHeight + 0.15f, 0), new Vector3(4f, 0.3f, 4f), mats.Nest, keepCollider: false);
+            // [임시] 둥지 동굴: 입구가 카메라(아래 Main Camera) 쪽을 본다
+            BuildCave(world, new Vector3(0, CliffHeight, 0), new Vector3(5.5f, 0, -11f),
+                width: 9f, height: 6f, back: 6f, front: 4f, floorDepth: CliffHeight, mats, seed: 7);
             var rng = new System.Random(77);
             for (int i = 0; i < 40; i++)
             {
@@ -414,6 +419,7 @@ namespace DragonRecipe.EditorTools
             public readonly Material DragonEye = Mat("DragonEye", new Color(1f, 0.9f, 0.2f));
             public readonly Material Prey = Mat("Prey", Color.white);
             public readonly Material JumpZone = Mat("JumpZone", new Color(1f, 0.8f, 0.25f));
+            public readonly Material CaveRock = Mat("CaveRock", new Color(0.36f, 0.33f, 0.31f));
             public readonly Material JumpLine = Mat("JumpLine", new Color(1f, 1f, 0.95f));
 
             static Material Mat(string name, Color c)
@@ -475,6 +481,10 @@ namespace DragonRecipe.EditorTools
                 new Vector3(14, CliffHeight, cliffLength), mats.Rock);
             Prim(PrimitiveType.Cylinder, "NestRing", world, new Vector3(0, CliffHeight + 0.15f, CliffEdgeZ - RunUpLength),
                 new Vector3(4f, 0.3f, 4f), mats.Nest, keepCollider: false);
+            // [임시] 둥지 동굴: 동굴 안에서 출발해 입구로 달려 나간다.
+            // 따라오는 카메라(성체는 둥지 뒤 약 20m, 위 9m)가 안쪽에 들어가도록 뒤로 깊고 천장이 높다
+            BuildCave(world, new Vector3(0, CliffHeight, CliffEdgeZ - RunUpLength), Vector3.forward,
+                width: 12f, height: 10f, back: 24f, front: CaveMouthAhead, floorDepth: CliffHeight, mats, seed: 3);
 
             // 도약 구간 (노란 띠) + 절벽 끝 흰 선 (완벽 거리)
             float zone = launch.jumpZoneLength;
@@ -525,12 +535,124 @@ namespace DragonRecipe.EditorTools
             }
         }
 
+        // ───────────────────────── 동굴 (임시) ─────────────────────────
+
+        /// <summary>
+        /// [임시] 프리미티브로 만든 동굴. 나중에 실제 모델로 바꿀 자리표시용.
+        /// floor = 둥지 자리 바닥, mouthDir = 입구가 바라보는 방향.
+        /// 안쪽 공간: 폭 width, 높이 height, 둥지 뒤로 back, 둥지 앞 입구까지 front.
+        /// floorDepth = 바닥 덩어리를 아래로 얼마나 채울지 (절벽 높이만큼 채우면 산처럼 보임).
+        /// </summary>
+        static Transform BuildCave(Transform parent, Vector3 floor, Vector3 mouthDir, float width, float height,
+            float back, float front, float floorDepth, Mats mats, int seed)
+        {
+            var cave = new GameObject("Cave").transform;
+            cave.SetParent(parent, false);
+            mouthDir.y = 0f;
+            cave.SetPositionAndRotation(floor, Quaternion.LookRotation(mouthDir.normalized, Vector3.up));
+
+            var rng = new System.Random(seed);
+            var mat = mats.CaveRock;
+            const float wall = 2.5f;
+            float depth = back + front;
+            float midZ = (front - back) * 0.5f;
+            float outerW = width + wall * 2f;
+
+            // 바닥 덩어리 (절벽 위로 이어지는 산의 몸통)
+            CavePart(PrimitiveType.Cube, "Base", cave, new Vector3(0, -floorDepth * 0.5f, midZ - wall * 0.5f), Vector3.zero,
+                new Vector3(outerW, floorDepth, depth + wall), mat);
+            // 양옆 벽, 안쪽 벽, 천장
+            CavePart(PrimitiveType.Cube, "WallL", cave, new Vector3(-(width + wall) * 0.5f, height * 0.5f, midZ - wall * 0.5f), Vector3.zero,
+                new Vector3(wall, height, depth + wall), mat);
+            CavePart(PrimitiveType.Cube, "WallR", cave, new Vector3((width + wall) * 0.5f, height * 0.5f, midZ - wall * 0.5f), Vector3.zero,
+                new Vector3(wall, height, depth + wall), mat);
+            CavePart(PrimitiveType.Cube, "WallBack", cave, new Vector3(0, height * 0.5f, -back - wall * 0.5f), Vector3.zero,
+                new Vector3(outerW, height, wall), mat);
+            CavePart(PrimitiveType.Cube, "Ceiling", cave, new Vector3(0, height + wall * 0.5f, midZ - wall * 0.5f), Vector3.zero,
+                new Vector3(outerW, wall, depth + wall), mat);
+
+            // 입구 둘레 바위: 네모난 입구를 울퉁불퉁한 아치처럼
+            for (int i = 0; i < 7; i++)
+            {
+                float t = i / 6f;
+                float x = Mathf.Lerp(-width * 0.5f, width * 0.5f, t);
+                float s = Range(rng, 2.2f, 3.4f);
+                CavePart(PrimitiveType.Sphere, $"MouthTop_{i}", cave, new Vector3(x, height + Range(rng, 0.3f, 0.9f), front),
+                    Vector3.zero, new Vector3(s, s * 0.8f, s * 0.7f), mat);
+            }
+            for (int side = -1; side <= 1; side += 2)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    float y = height * (0.15f + 0.3f * i);
+                    float s = Range(rng, 2f, 3.2f);
+                    CavePart(PrimitiveType.Sphere, $"MouthSide_{(side < 0 ? "L" : "R")}{i}", cave,
+                        new Vector3(side * (width * 0.5f + Range(rng, 0f, 0.4f)), y, front), Vector3.zero,
+                        new Vector3(s * 0.7f, s, s * 0.7f), mat);
+                }
+            }
+
+            // 바깥 혹: 상자 모양 실루엣을 깨는 큰 바위들 (천장 위, 양옆)
+            int lumps = Mathf.RoundToInt(depth / 3f);
+            for (int i = 0; i < lumps; i++)
+            {
+                float z = Range(rng, -back, front - 1f);
+                float s = Range(rng, 4f, 7f);
+                CavePart(PrimitiveType.Sphere, $"LumpTop_{i}", cave,
+                    new Vector3(Range(rng, -width * 0.4f, width * 0.4f), height + wall + s * 0.15f, z), Vector3.zero,
+                    new Vector3(s * 1.2f, s * 0.6f, s), mat);
+                int side = rng.Next(2) == 0 ? -1 : 1;
+                CavePart(PrimitiveType.Cube, $"LumpSide_{i}", cave,
+                    new Vector3(side * (outerW * 0.5f + Range(rng, -0.5f, 0.3f)), Range(rng, 0.5f, height), z),
+                    new Vector3(Range(rng, -20f, 20f), Range(rng, 0f, 90f), Range(rng, -20f, 20f)),
+                    new Vector3(Range(rng, 2f, 3.5f), Range(rng, 2.5f, 5f), Range(rng, 2.5f, 4.5f)), mat);
+            }
+
+            // 종유석 (천장에서 매달린 뾰족 바위, 콜라이더 없음)
+            int drips = Mathf.RoundToInt(depth / 2.5f);
+            for (int i = 0; i < drips; i++)
+            {
+                float len = Range(rng, 0.8f, 2f);
+                CavePart(PrimitiveType.Cube, $"Stalactite_{i}", cave,
+                    new Vector3(Range(rng, -width * 0.42f, width * 0.42f), height - len * 0.5f, Range(rng, -back + 0.5f, front - 1.5f)),
+                    new Vector3(0f, 45f, 0f), new Vector3(0.35f, len, 0.35f), mat, collider: false);
+            }
+
+            // 둥지를 비추는 따뜻한 불빛
+            var lightGo = new GameObject("CaveGlow");
+            lightGo.transform.SetParent(cave, false);
+            lightGo.transform.localPosition = new Vector3(0f, Mathf.Min(3.5f, height * 0.5f), -0.5f);
+            var glow = lightGo.AddComponent<Light>();
+            glow.type = LightType.Point;
+            glow.color = new Color(1f, 0.72f, 0.42f);
+            glow.intensity = 4f;
+            glow.range = width * 1.8f;
+            glow.shadows = LightShadows.None;
+
+            return cave;
+        }
+
+        static GameObject CavePart(PrimitiveType type, string name, Transform cave, Vector3 localPos, Vector3 localEuler,
+            Vector3 scale, Material mat, bool collider = true)
+        {
+            var go = GameObject.CreatePrimitive(type);
+            go.name = name;
+            go.transform.SetParent(cave, false);
+            go.transform.localPosition = localPos;
+            go.transform.localRotation = Quaternion.Euler(localEuler);
+            go.transform.localScale = scale;
+            go.GetComponent<Renderer>().sharedMaterial = mat;
+            if (!collider) Object.DestroyImmediate(go.GetComponent<Collider>());
+            return go;
+        }
+
         static Vector3 RandomPoint(System.Random rng, float keepOut)
         {
             while (true)
             {
                 var p = new Vector3(Range(rng, -200, 200), 0, Range(rng, -40, 420));
-                if (new Vector2(p.x, p.z).magnitude > keepOut) return p;
+                bool inCave = Mathf.Abs(p.x) < 15f && p.z < CliffEdgeZ;
+                if (!inCave && new Vector2(p.x, p.z).magnitude > keepOut) return p;
             }
         }
 
