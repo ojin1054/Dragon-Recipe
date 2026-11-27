@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0aab56ee24598744da4a962e0513aa3c, type: 3}
+  m_Name: Food_ember_lizard
+  m_EditorClassIdentifier: DragonRecipe.Runtime::DragonRecipe.Food.FoodData
+  id: ember_lizard
+  displayName: "\uBD88\uAF43\uB3C4\uB9C8\uBC40"
+  satiety: 8
+  trait: 2
+  color: {r: 1, g: 0.3, b: 0.05, a: 1}
+  bodySize: {x: 0.4, y: 0.25, z: 0.9}
+  wanderSpeed: 3
+  flees: 1
+  fleeSpeed: 9
+  fleeRadius: 25
+  spawnWeight: 1

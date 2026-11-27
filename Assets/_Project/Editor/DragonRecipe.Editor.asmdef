@@ -1,0 +1,20 @@
+{
+    "name": "DragonRecipe.Editor",
+    "rootNamespace": "DragonRecipe.EditorTools",
+    "references": [
+        "DragonRecipe.Runtime",
+        "Unity.InputSystem",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
