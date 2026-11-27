@@ -1,27 +1,47 @@
+using System;
+using DragonRecipe.Core;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace DragonRecipe.Flight
 {
     /// <summary>
-    /// 키보드(WASD/방향키 + Space), 게임패드(왼쪽 스틱 + A),
+    /// 키보드(WASD/방향키 + Space, Esc/P), 게임패드(왼쪽 스틱 + A, Start),
     /// 모바일 화면 조이스틱/버튼(OnScreenStick/Button → 가상 게임패드)을 한 번에 받는다.
     /// </summary>
     public class DragonInput : MonoBehaviour
     {
-        [Tooltip("켜면 스틱을 위로 밀 때 기수가 내려감 (비행기식)")]
-        public bool invertPitch;
+        const string InvertPitchKey = "DragonRecipe.InvertPitch";
 
         InputAction _move;
         InputAction _flap;
+        InputAction _pause;
         bool _flapBuffered;
+
+        /// <summary>일시정지 버튼(Esc / P / 패드 Start)이 눌림</summary>
+        public event Action PausePressed;
+
+        /// <summary>
+        /// 상/하 반전. 기본(꺼짐)은 스틱 위 = 기수 위, 켜면 스틱 위 = 기수 아래 (비행기식).
+        /// 기기에 저장된다.
+        /// </summary>
+        public bool InvertPitch
+        {
+            get => PlayerPrefs.GetInt(InvertPitchKey, 0) == 1;
+            set
+            {
+                PlayerPrefs.SetInt(InvertPitchKey, value ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
 
         public Vector2 Move
         {
             get
             {
-                var v = _move != null ? _move.ReadValue<Vector2>() : Vector2.zero;
-                if (invertPitch) v.y = -v.y;
+                if (GamePause.IsPaused || _move == null) return Vector2.zero;
+                var v = _move.ReadValue<Vector2>();
+                if (InvertPitch) v.y = -v.y;
                 return Vector2.ClampMagnitude(v, 1f);
             }
         }
@@ -48,19 +68,30 @@ namespace DragonRecipe.Flight
             _flap = new InputAction("Flap", InputActionType.Button);
             _flap.AddBinding("<Keyboard>/space");
             _flap.AddBinding("<Gamepad>/buttonSouth");
-            _flap.performed += _ => _flapBuffered = true;
+            _flap.performed += _ =>
+            {
+                if (!GamePause.IsPaused) _flapBuffered = true; // 일시정지 중 누른 건 재개 후에 터지지 않게
+            };
+
+            _pause = new InputAction("Pause", InputActionType.Button);
+            _pause.AddBinding("<Keyboard>/escape");
+            _pause.AddBinding("<Keyboard>/p");
+            _pause.AddBinding("<Gamepad>/start");
+            _pause.performed += _ => PausePressed?.Invoke();
         }
 
         void OnEnable()
         {
             _move.Enable();
             _flap.Enable();
+            _pause.Enable();
         }
 
         void OnDisable()
         {
             _move.Disable();
             _flap.Disable();
+            _pause.Disable();
             _flapBuffered = false;
         }
 
@@ -68,6 +99,7 @@ namespace DragonRecipe.Flight
         {
             _move.Dispose();
             _flap.Dispose();
+            _pause.Dispose();
         }
     }
 }

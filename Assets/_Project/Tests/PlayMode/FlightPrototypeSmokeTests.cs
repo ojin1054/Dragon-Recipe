@@ -51,5 +51,35 @@ namespace DragonRecipe.Tests
             session.ResetFlight();
             Assert.AreEqual(FlightSession.State.Ready, session.Current);
         }
+
+        [UnityTest]
+        public IEnumerator Pause_FreezesFlight_AndShowsMenu()
+        {
+            yield return SceneManager.LoadSceneAsync("FlightPrototype");
+            yield return null;
+
+            var session = Object.FindFirstObjectByType<FlightSession>();
+            var menu = Object.FindFirstObjectByType<DragonRecipe.UI.PauseMenu>();
+            Assert.IsNotNull(menu, "PauseMenu 없음");
+
+            typeof(FlightSession).GetMethod("Launch", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                .Invoke(session, null);
+            yield return new WaitForSeconds(0.3f);
+
+            GamePause.Set(true);
+            Assert.AreEqual(0f, Time.timeScale);
+            Assert.IsTrue(menu.panel.activeSelf, "일시정지 메뉴가 안 뜸");
+            Vector3 pos = session.dragon.transform.position;
+            float airtime = session.Result.airtime;
+            for (int i = 0; i < 10; i++) yield return null;
+            Assert.AreEqual(pos, session.dragon.transform.position, "일시정지 중에 드래곤이 움직임");
+            Assert.AreEqual(airtime, session.Result.airtime, "일시정지 중에 체공 시간이 흐름");
+
+            GamePause.Set(false);
+            Assert.AreEqual(1f, Time.timeScale);
+            Assert.IsFalse(menu.panel.activeSelf);
+            yield return new WaitForSeconds(0.2f);
+            Assert.AreNotEqual(pos, session.dragon.transform.position, "재개 후 드래곤이 안 움직임");
+        }
     }
 }

@@ -66,7 +66,7 @@ namespace DragonRecipe.UI
             if (promptText)
             {
                 promptText.enabled = session.Current == FlightSession.State.Ready;
-                promptText.text = "날갯짓(Space / A / 화면 버튼)으로 이륙!\n조이스틱: 위·아래로 기수, 좌·우로 선회";
+                promptText.text = "날갯짓(Space / A / 화면 버튼)으로 이륙!\n조이스틱: 위·아래로 기수, 좌·우로 기울여 선회 (손을 떼도 유지)\n일시정지: Esc / P / 패드 Start";
             }
 
             if (feedbackText)
