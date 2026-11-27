@@ -176,30 +176,73 @@ namespace DragonRecipe.Tests
             Assert.Greater(FlightRules.SnatchMultiplier(lowFast), FlightRules.SnatchMultiplier(highSlow));
         }
 
-        // ── 이륙 힘 모으기 ──
+        // ── 이륙: 달리기(파워) + 웅크리기(높이) ──
 
         [Test]
-        public void ChargeLevel_FillsThenDrains_WhenHeldTooLong()
+        public void RunUp_TappingBuildsSpeed_AndStoppingSlowsDown()
         {
-            var p = new FlightParams { launchChargeTime = 1f };
-            Assert.AreEqual(0f, FlightModel.ChargeLevel(0f, p), 1e-4f);
-            Assert.AreEqual(0.5f, FlightModel.ChargeLevel(0.5f, p), 1e-4f);
-            Assert.AreEqual(1f, FlightModel.ChargeLevel(1f, p), 1e-4f);
-            Assert.AreEqual(0.7f, FlightModel.ChargeLevel(1.3f, p), 1e-4f, "가득 찬 뒤 계속 누르면 줄어들어야 함");
+            var p = new FlightParams();
+            var run = new RunUpModel(100f);
+            for (int i = 0; i < 4; i++) run.Tap(p);
+            Assert.AreEqual(p.runTapAccel * 4f, run.RunSpeed, 1e-4f);
+            float before = run.RunSpeed;
+            for (int i = 0; i < 25; i++) run.Step(Dt, p);
+            Assert.Less(run.RunSpeed, before, "탭을 멈추면 느려져야 함");
+            Assert.Greater(run.Distance, 0f);
         }
 
         [Test]
-        public void PerfectCharge_OnlyNearFull()
+        public void RunUp_CanOnlyCrouchInJumpZone()
         {
-            var p = new FlightParams { launchPerfectWindow = 0.1f };
-            Assert.IsTrue(FlightModel.IsPerfectCharge(0.95f, p));
-            Assert.IsFalse(FlightModel.IsPerfectCharge(0.8f, p));
+            var p = new FlightParams { jumpZoneLength = 5f };
+            var run = new RunUpModel(20f);
+            Assert.IsFalse(run.TryCrouch(p), "구간 밖에서는 웅크릴 수 없음");
+            run.Tap(p);
+            while (!run.InJumpZone(p)) { run.Tap(p); run.Step(Dt, p); }
+            Assert.IsTrue(run.TryCrouch(p));
+            Assert.IsTrue(run.IsCrouching);
         }
 
-        static float LaunchAndMeasure(float charge, bool perfect, out float speed)
+        [Test]
+        public void RunUp_PassingTheEdge_IsStumble()
+        {
+            var p = new FlightParams();
+            var plan = RunUpModel.Evaluate(p.runMaxSpeed, -0.2f, p.crouchFullTime, p);
+            Assert.AreEqual(LaunchGrade.Stumble, plan.grade);
+            Assert.AreEqual(0f, plan.height);
+        }
+
+        [Test]
+        public void Crouch_FullDepthAtEdge_IsPerfect_EarlyOrShallowIsWorse()
+        {
+            var p = new FlightParams();
+            var perfect = RunUpModel.Evaluate(p.runMaxSpeed, 0.5f, p.crouchFullTime, p);
+            var early = RunUpModel.Evaluate(p.runMaxSpeed, p.jumpZoneLength, p.crouchFullTime, p);
+            var shallow = RunUpModel.Evaluate(p.runMaxSpeed, 0.5f, p.crouchFullTime * 0.3f, p);
+
+            Assert.AreEqual(LaunchGrade.Perfect, perfect.grade);
+            Assert.AreEqual(1f, perfect.height, 1e-4f);
+            Assert.AreEqual(LaunchGrade.Weak, early.grade);
+            Assert.AreEqual(LaunchGrade.Weak, shallow.grade);
+            Assert.Less(early.height, perfect.height);
+            Assert.Less(shallow.height, perfect.height);
+        }
+
+        [Test]
+        public void RunPower_OnlyAffectsSpeed_CrouchOnlyAffectsHeight()
+        {
+            var p = new FlightParams();
+            var slow = RunUpModel.Evaluate(0f, 0.5f, p.crouchFullTime, p);
+            var fast = RunUpModel.Evaluate(p.runMaxSpeed, 0.5f, p.crouchFullTime, p);
+            Assert.AreEqual(0f, slow.power, 1e-4f);
+            Assert.AreEqual(1f, fast.power, 1e-4f);
+            Assert.AreEqual(slow.height, fast.height, 1e-4f);
+        }
+
+        static float LaunchAndMeasure(float power, float height, LaunchGrade grade, out float speed)
         {
             var m = new FlightModel(new FlightParams());
-            m.Launch(new Vector3(0, 10f, 0), 0f, charge, perfect);
+            m.Launch(new Vector3(0, 30f, 0), 0f, new LaunchPlan { power = power, height = height, grade = grade });
             speed = m.Speed;
             float maxY = m.Position.y;
             for (float t = 0; t < 3f; t += Dt)
@@ -211,27 +254,24 @@ namespace DragonRecipe.Tests
         }
 
         [Test]
-        public void ChargedLaunch_IsFasterAndHigherThanTap()
+        public void Launch_PowerGivesSpeed_HeightGivesAltitude()
         {
-            float tapY = LaunchAndMeasure(0f, false, out float tapSpeed);
-            float fullY = LaunchAndMeasure(1f, false, out float fullSpeed);
-            float perfectY = LaunchAndMeasure(1f, true, out float perfectSpeed);
+            LaunchAndMeasure(0f, 0f, LaunchGrade.Weak, out float weakSpeed);
+            LaunchAndMeasure(1f, 0f, LaunchGrade.Weak, out float fastSpeed);
+            Assert.Greater(fastSpeed, weakSpeed, "잘 달리면 더 빠르게 출발");
 
-            Assert.Greater(fullSpeed, tapSpeed);
-            Assert.Greater(fullY, tapY + 3f, "힘을 모으면 확실히 더 높이 올라가야 함");
-            Assert.Greater(perfectSpeed, fullSpeed);
-            Assert.Greater(perfectY, fullY);
+            float lowY = LaunchAndMeasure(0.5f, 0f, LaunchGrade.Weak, out _);
+            float highY = LaunchAndMeasure(0.5f, 1f, LaunchGrade.Good, out _);
+            float perfectY = LaunchAndMeasure(0.5f, 1f, LaunchGrade.Perfect, out _);
+            Assert.Greater(highY, lowY + 3f, "잘 웅크리면 확실히 더 높이");
+            Assert.Greater(perfectY, highY, "완벽한 도약 보너스");
         }
 
         [Test]
-        public void TapLaunch_MatchesOldBehaviour()
+        public void Stumble_DoesNotGainHeight()
         {
-            var p = new FlightParams();
-            var m = new FlightModel(p);
-            m.Launch(Vector3.zero, 0f, 0f, false);
-            Assert.AreEqual(p.launchSpeed, m.Speed, 1e-4f);
-            Assert.AreEqual(p.launchRise, m.VerticalSpeed, 1e-4f);
-            Assert.AreEqual(0f, m.Pitch, 1e-4f);
+            float stumbleY = LaunchAndMeasure(1f, 1f, LaunchGrade.Stumble, out _);
+            Assert.LessOrEqual(stumbleY, 30.01f);
         }
     }
 }

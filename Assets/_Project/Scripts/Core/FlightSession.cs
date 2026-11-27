@@ -6,7 +6,8 @@ using UnityEngine;
 namespace DragonRecipe.Core
 {
     /// <summary>
-    /// 비행 한 판의 흐름: 둥지 대기 → (날갯짓을 꾹 눌러 힘을 모았다가 떼면) 이륙 → 비행 → 착지/추락 → 결과.
+    /// 비행 한 판의 흐름: 둥지 대기 → 도움닫기(날갯짓 연타로 달리고, 도약 구간에서 웅크리기 버튼을 꾹 눌렀다가 떼면 도약)
+    /// → 비행 → 착지/추락 → 결과.
     /// </summary>
     public class FlightSession : MonoBehaviour
     {
@@ -21,8 +22,10 @@ namespace DragonRecipe.Core
         public DragonInput input;
         public SnatchZone snatchZone;
         public PreySpawner spawner;
-        [Tooltip("이륙 지점 (둥지). 이 오브젝트의 앞 방향으로 출발")]
+        [Tooltip("이륙 지점 (둥지). 이 오브젝트의 앞 방향으로 달려 나간다")]
         public Transform nest;
+        [Tooltip("절벽 끝 (도약 지점). 비우면 둥지 바로 앞이 도약 구간")]
+        public Transform launchEdge;
         [Tooltip("이 고도 아래에서 낚아채면 아슬아슬 보너스 계산")]
         public float nearMissAltitude = 3.5f;
         [Tooltip("아슬아슬 최대 보너스 (1 = 포만도 최대 2배)")]
@@ -68,15 +71,7 @@ namespace DragonRecipe.Core
             switch (Current)
             {
                 case State.Ready:
-                    if (!dragon.IsCharging)
-                    {
-                        if (input && input.ConsumeFlap()) dragon.BeginCharge();
-                    }
-                    else
-                    {
-                        dragon.TickCharge(Time.deltaTime);
-                        if (!input || !input.FlapHeld) Launch(); // 버튼을 떼는 순간 도약
-                    }
+                    UpdateRunUp();
                     break;
                 case State.Flying:
                     Result.airtime += Time.deltaTime;
@@ -93,23 +88,59 @@ namespace DragonRecipe.Core
         {
             Result = new FlightResult();
             if (snatchZone) snatchZone.Armed = false;
-            if (nest) dragon.Park(nest.position, nest.eulerAngles.y);
+            if (nest) dragon.Park(nest.position, nest.eulerAngles.y, RunUpDistance());
             if (spawner) spawner.ResetAll();
             SetState(State.Ready);
         }
 
-        /// <summary>모은 힘만큼 도약 (힘을 안 모았으면 그냥 출발)</summary>
+        /// <summary>둥지에서 절벽 끝까지 (둥지 앞 방향 기준) 거리</summary>
+        float RunUpDistance()
+        {
+            if (!nest || !launchEdge) return 0f;
+            return Mathf.Max(0f, Vector3.Dot(launchEdge.position - nest.position, nest.forward));
+        }
+
+        /// <summary>날갯짓 연타 = 달리기, 도약 구간에서 웅크리기 버튼 누르기 = 웅크리기, 떼기 = 도약</summary>
+        void UpdateRunUp()
+        {
+            var run = dragon.RunUp;
+            if (run == null) return;
+            if (run.Overran)
+            {
+                Launch(); // 떼지 못하고 절벽을 넘어감
+                return;
+            }
+
+            var p = dragon.Model.Params;
+            if (!input) return;
+            if (!run.IsCrouching)
+            {
+                if (input.ConsumeFlap()) run.Tap(p);
+                // 구간 밖에서 미리 누르고 있으면 구간에 들어서는 순간 웅크린다
+                if (input.CrouchHeld) run.TryCrouch(p);
+            }
+            else
+            {
+                input.ConsumeFlap(); // 웅크린 뒤의 날갯짓은 무시
+                if (!input.CrouchHeld) Launch(); // 웅크리기 버튼을 떼는 순간 도약
+            }
+        }
+
         void Launch()
         {
-            float charge = dragon.Charge;
-            bool perfect = dragon.ChargeIsPerfect;
-            dragon.Launch(charge, perfect);
+            var plan = dragon.Launch();
             if (snatchZone) snatchZone.Armed = true;
             SetState(State.Flying);
 
-            if (perfect) Feedback?.Invoke("완벽한 도약!", Good);
-            else if (charge >= 0.5f) Feedback?.Invoke("힘찬 도약!", Info);
-            else Feedback?.Invoke(dragon.Model.Params.needsFlapping ? "리듬에 맞춰 날갯짓!" : "날아올라!", Info);
+            switch (plan.grade)
+            {
+                case LaunchGrade.Perfect: Feedback?.Invoke("완벽한 도약!", Good); break;
+                case LaunchGrade.Good: Feedback?.Invoke("좋은 도약!", Info); break;
+                case LaunchGrade.Stumble: Feedback?.Invoke("앗, 발을 헛디뎠어요!", Bad); break;
+                default:
+                    Feedback?.Invoke(plan.depth < 1f ? "덜 웅크렸어요" : "너무 일찍 뛰었어요", Bad);
+                    break;
+            }
         }
 
         void OnFlapped(FlapOutcome outcome)

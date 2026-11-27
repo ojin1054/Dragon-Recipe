@@ -14,16 +14,21 @@ namespace DragonRecipe.UI
 
         public Text statsText;
         public Image staminaFill;
-        [Tooltip("스태미나 바 이름표. 힘 모으는 동안 '도약 힘'으로 바뀐다 (비우면 바 안에서 찾음)")]
+        [Tooltip("스태미나 바 이름표. 이륙 전에는 '달리기 파워' / '웅크리기'로 바뀐다 (비우면 바 안에서 찾음)")]
         public Text staminaLabel;
         public Text promptText;
         public Text feedbackText;
+        [Tooltip("모바일 웅크리기 버튼. 이륙 전에만 보인다")]
+        public GameObject crouchButton;
+        [Tooltip("모바일 날갯짓 버튼 글자. 이륙 전에는 '달리기'")]
+        public Text flapButtonLabel;
         public float feedbackDuration = 1.4f;
 
         static readonly Color StaminaOk = new Color(0.45f, 0.85f, 1f);
         static readonly Color StaminaLow = new Color(1f, 0.4f, 0.35f);
-        static readonly Color ChargeColor = new Color(1f, 0.7f, 0.25f);
-        static readonly Color ChargePerfect = new Color(1f, 1f, 0.6f);
+        static readonly Color RunColor = new Color(1f, 0.55f, 0.25f);
+        static readonly Color CrouchColor = new Color(1f, 0.8f, 0.3f);
+        static readonly Color CrouchFull = new Color(1f, 1f, 0.65f);
 
         float _feedbackTimer;
 
@@ -62,6 +67,23 @@ namespace DragonRecipe.UI
             return $"\n{CareLogic.StageName(s.stage)} · 포만도 {s.hunger / c.maxHunger * 100f:0}%{status}";
         }
 
+        static string RunUpPrompt(RunUpModel run, FlightParams p)
+        {
+            if (run == null) return "";
+            string toEdge = $"절벽 끝까지 {Mathf.Max(0f, run.Remaining):0.0} m";
+            if (run.IsCrouching)
+                return run.CrouchDepth(p) < 1f
+                    ? $"웅크리는 중…\n{toEdge}"
+                    : $"흰 선에서 웅크리기 버튼을 떼세요!\n{toEdge}";
+            if (run.InJumpZone(p))
+                return $"지금 웅크리기(Shift / B)를 꾹!\n{toEdge}";
+            if (run.Started)
+                return $"날갯짓 연타! 노란 구간에서 웅크리기(Shift / B)를 꾹\n{toEdge}";
+            return "날갯짓 버튼(Space / A) 연타로 절벽까지 달리기! (빠를수록 빠르게)\n" +
+                   "노란 구간에서 웅크리기(Shift / B) 꾹 → 흰 선에서 떼기! (잘 뛸수록 높게)\n" +
+                   "조이스틱: 기수·선회 · 일시정지: Esc / P / Start";
+        }
+
         void Update()
         {
             if (!session || !dragon) return;
@@ -69,7 +91,7 @@ namespace DragonRecipe.UI
 
             if (statsText)
             {
-                float speed = dragon.IsFlying ? m.Velocity.magnitude : 0f;
+                float speed = dragon.IsFlying ? m.Velocity.magnitude : dragon.RunUp?.RunSpeed ?? 0f;
                 string stall = dragon.IsFlying && m.IsStalling ? "  <color=#ff7766>실속!</color>" : "";
                 statsText.text =
                     $"고도 {dragon.Altitude:0} m\n" +
@@ -79,32 +101,41 @@ namespace DragonRecipe.UI
                     CareLine();
             }
 
-            bool charging = dragon.IsCharging;
+            var run = dragon.IsFlying ? null : dragon.RunUp;
+            var p = m.Params;
             if (staminaFill)
             {
-                if (charging)
+                if (run != null && run.IsCrouching)
                 {
-                    // 이륙 전에는 같은 바를 도약 게이지로 쓴다
-                    staminaFill.fillAmount = dragon.Charge;
-                    staminaFill.color = dragon.ChargeIsPerfect ? ChargePerfect : ChargeColor;
+                    float d = run.CrouchDepth(p);
+                    staminaFill.fillAmount = d;
+                    staminaFill.color = d >= 1f ? CrouchFull : CrouchColor;
+                }
+                else if (run != null)
+                {
+                    // 이륙 전에는 같은 바를 달리기 파워로 쓴다
+                    staminaFill.fillAmount = run.PowerFraction(p);
+                    staminaFill.color = RunColor;
                 }
                 else
                 {
-                    float t = m.Params.maxStamina > 0 ? m.Stamina / m.Params.maxStamina : 0f;
+                    float t = p.maxStamina > 0 ? m.Stamina / p.maxStamina : 0f;
                     staminaFill.fillAmount = t;
-                    staminaFill.color = m.Stamina < m.Params.flapStaminaCost ? StaminaLow : StaminaOk;
+                    staminaFill.color = m.Stamina < p.flapStaminaCost ? StaminaLow : StaminaOk;
                 }
             }
             if (staminaLabel)
-                staminaLabel.text = charging ? (dragon.ChargeIsPerfect ? "지금 떼세요!" : "도약 힘") : "스태미나";
+                staminaLabel.text = run == null ? "스태미나" : run.IsCrouching ? "웅크리기 (높이)" : "달리기 파워 (속도)";
 
             if (promptText)
             {
                 promptText.enabled = session.Current == FlightSession.State.Ready;
-                promptText.text = charging
-                    ? "힘을 모으는 중… 게이지가 가득 찼을 때 떼면 완벽한 도약!"
-                    : "날갯짓(Space / A / 화면 버튼)을 꾹 눌러 힘을 모았다가 떼면 이륙! (오래 모을수록 더 빠르고 높게)\n조이스틱: 위·아래로 기수, 좌·우로 기울여 선회 (손을 떼도 유지)\n일시정지: Esc / P / 패드 Start";
+                promptText.text = RunUpPrompt(run, p);
             }
+
+            bool ready = session.Current == FlightSession.State.Ready;
+            if (crouchButton && crouchButton.activeSelf != ready) crouchButton.SetActive(ready);
+            if (flapButtonLabel) flapButtonLabel.text = ready ? "달리기" : "날갯짓";
 
             if (feedbackText)
             {

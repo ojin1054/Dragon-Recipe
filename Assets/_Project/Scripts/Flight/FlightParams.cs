@@ -29,23 +29,38 @@ namespace DragonRecipe.Flight
         public float stallSpeed = 8f;
         public float maxSpeed = 40f;
 
-        [Header("이륙 (힘 모으기)")]
-        [Tooltip("힘을 모으지 않고 바로 뗐을 때의 출발 속도")]
+        [Header("이륙: 달리기 (= 파워 → 출발 속도)")]
+        [Tooltip("탭 한 번에 붙는 달리기 속도 (m/s)")]
+        public float runTapAccel = 1.5f;
+        public float runMaxSpeed = 11f;
+        [Tooltip("탭을 멈추면 줄어드는 달리기 속도 (m/s²)")]
+        public float runFriction = 3f;
+        [Tooltip("달리기 파워 0일 때 출발 속도")]
         public float launchSpeed = 12f;
-        [Tooltip("힘을 가득 모았을 때의 출발 속도")]
+        [Tooltip("최고 속도로 달려 뛰었을 때 출발 속도")]
         public float launchMaxSpeed = 24f;
-        [Tooltip("바로 뗐을 때 뛰어오르는 수직 속도")]
+
+        [Header("이륙: 웅크리기 (= 높이)")]
+        [Tooltip("절벽 끝에서 이 거리 안(도약 구간)에서만 웅크릴 수 있다 (m)")]
+        public float jumpZoneLength = 10f;
+        [Tooltip("절벽 끝까지 이 거리 안에서 떼면 위치 만점 (m)")]
+        public float perfectJumpDistance = 2.5f;
+        [Tooltip("이 시간 동안 웅크려야 끝까지 웅크린 것 (초)")]
+        public float crouchFullTime = 0.45f;
+        [Tooltip("웅크린 채 미끄러지며 줄어드는 달리기 속도 (m/s²)")]
+        public float crouchDecel = 5f;
+        [Tooltip("높이 점수가 이 이상이면 '좋은 도약'")]
+        public float goodJumpThreshold = 0.6f;
+        [Tooltip("높이 점수 0일 때 뛰어오르는 수직 속도")]
         public float launchRise = 2f;
-        [Tooltip("가득 모았을 때 뛰어오르는 수직 속도 (maxRiseSpeed를 넘지 않음)")]
+        [Tooltip("높이 점수 1일 때 뛰어오르는 수직 속도 (maxRiseSpeed를 넘지 않음)")]
         public float launchMaxRise = 7f;
-        [Tooltip("가득 모았을 때 출발 기수 각도 (deg). 속도를 높이로 바꿔 준다")]
-        public float launchMaxPitch = 20f;
-        [Tooltip("게이지가 0 → 가득까지 차는 시간 (초). 계속 누르고 있으면 다시 줄어든다")]
-        public float launchChargeTime = 0.9f;
-        [Tooltip("게이지가 (1 - 이 값) 이상일 때 떼면 '완벽한 도약'")]
-        public float launchPerfectWindow = 0.12f;
-        [Tooltip("완벽한 도약일 때 출발 속도/상승 배율")]
-        public float launchPerfectBonus = 1.2f;
+        [Tooltip("높이 점수 1일 때 출발 기수 각도 (deg). 속도를 높이로 바꿔 준다")]
+        public float launchMaxPitch = 22f;
+        [Tooltip("완벽한 도약일 때 기수 각도 배율")]
+        public float launchPerfectBonus = 1.25f;
+        [Tooltip("발을 헛디뎌 떨어질 때 기수 각도 (deg, 음수 = 아래)")]
+        public float stumblePitch = -15f;
 
         [Header("조종")]
         public float maxPitchUp = 35f;

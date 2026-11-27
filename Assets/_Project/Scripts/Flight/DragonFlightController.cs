@@ -22,21 +22,17 @@ namespace DragonRecipe.Flight
         /// <summary>바로 아래 지면까지 거리 (m)</summary>
         public float Altitude { get; private set; }
 
-        /// <summary>이륙 전, 날갯짓 버튼을 누른 채 힘을 모으는 중</summary>
-        public bool IsCharging { get; private set; }
-        /// <summary>도약 게이지 (0~1)</summary>
-        public float Charge => IsCharging ? FlightModel.ChargeLevel(_chargeTime, Model.Params) : 0f;
-        public bool ChargeIsPerfect => IsCharging && FlightModel.IsPerfectCharge(Charge, Model.Params);
+        /// <summary>이륙 전 도움닫기 (둥지 → 절벽 끝). 비행 중에는 null</summary>
+        public RunUpModel RunUp { get; private set; }
 
         public event Action<FlapOutcome> Flapped;
-        /// <summary>(게이지, 완벽한 도약 여부)</summary>
-        public event Action<float, bool> Launched;
+        public event Action<LaunchPlan> Launched;
         /// <summary>(종류, 충돌 시 속도)</summary>
         public event Action<ImpactType, Vector3> Impacted;
 
         Rigidbody _rb;
         bool _flapRequested;
-        float _chargeTime;
+        Vector3 _runStart;
 
         void Awake()
         {
@@ -58,10 +54,12 @@ namespace DragonRecipe.Flight
         }
 
         /// <summary>둥지에 세워 둔다 (비행 안 함)</summary>
-        public void Park(Vector3 position, float yaw)
+        /// <param name="runUpDistance">둥지에서 절벽 끝까지 거리. 0이면 바로 도약 구간</param>
+        public void Park(Vector3 position, float yaw, float runUpDistance = 0f)
         {
             IsFlying = false;
-            IsCharging = false;
+            _runStart = position;
+            RunUp = new RunUpModel(runUpDistance);
             Model.Reset(position, yaw, 0f);
             _rb.position = position;
             _rb.rotation = Quaternion.Euler(0, yaw, 0);
@@ -69,31 +67,18 @@ namespace DragonRecipe.Flight
             UpdateAltitude();
         }
 
-        /// <summary>둥지에서 웅크리고 힘을 모으기 시작</summary>
-        public void BeginCharge()
+        /// <summary>도움닫기를 끝내고 도약한다 (판정은 RunUp 상태로 계산)</summary>
+        public LaunchPlan Launch()
         {
-            if (IsFlying) return;
-            IsCharging = true;
-            _chargeTime = 0f;
-        }
-
-        public void TickCharge(float dt)
-        {
-            if (IsCharging) _chargeTime += dt;
-        }
-
-        /// <summary>힘을 모으지 않고 바로 출발</summary>
-        public void Launch() => Launch(0f, false);
-
-        /// <param name="charge">도약 게이지 (0~1)</param>
-        /// <param name="perfect">게이지가 가득 찬 순간에 뗐는지</param>
-        public void Launch(float charge, bool perfect)
-        {
-            Model.Launch(transform.position, Model.Yaw, charge, perfect);
-            IsCharging = false;
+            var plan = RunUp != null
+                ? RunUp.Release(Model.Params)
+                : RunUpModel.Evaluate(0f, 0f, 0f, Model.Params);
+            Model.Launch(_rb.position, Model.Yaw, plan);
+            RunUp = null;
             IsFlying = true;
             input?.ConsumeFlap();
-            Launched?.Invoke(charge, perfect);
+            Launched?.Invoke(plan);
+            return plan;
         }
 
         void Update()
@@ -108,6 +93,7 @@ namespace DragonRecipe.Flight
             if (!IsFlying)
             {
                 _flapRequested = false;
+                StepRunUp(Time.fixedDeltaTime);
                 return;
             }
 
@@ -148,6 +134,17 @@ namespace DragonRecipe.Flight
                 IsFlying = false;
                 Impacted?.Invoke(ImpactType.Crashed, Model.Velocity);
             }
+        }
+
+        /// <summary>둥지에서 절벽 끝 방향으로 달린다 (땅 위, 높이 고정)</summary>
+        void StepRunUp(float dt)
+        {
+            if (RunUp == null || !RunUp.Started) return;
+            RunUp.Step(dt, Model.Params);
+            Vector3 forward = Quaternion.Euler(0, Model.Yaw, 0) * Vector3.forward;
+            Vector3 pos = _runStart + forward * RunUp.Distance;
+            Model.Position = pos;
+            _rb.MovePosition(pos);
         }
 
         /// <summary>비행 중이 아닐 때 자세를 바꾼다 (예: 추락 후 쓰러진 모습)</summary>

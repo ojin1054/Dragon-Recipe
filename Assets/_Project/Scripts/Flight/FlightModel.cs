@@ -69,24 +69,27 @@ namespace DragonRecipe.Flight
         }
 
         /// <summary>
-        /// 힘을 모은 만큼 도약한다. charge 0 = 그냥 출발, 1 = 더 빠르게, 기수를 든 채 높이 뛰어오름.
+        /// 절벽에서 도약한다. 달리기 파워 → 출발 속도, 웅크리기 판정 → 상승 속도와 기수 각도.
         /// </summary>
-        public void Launch(Vector3 position, float yaw, float charge, bool perfect)
+        public void Launch(Vector3 position, float yaw, LaunchPlan plan)
         {
             var p = Params;
-            charge = Mathf.Clamp01(charge);
-            float bonus = perfect ? p.launchPerfectBonus : 1f;
-            Reset(position, yaw, Mathf.Min(Mathf.Lerp(p.launchSpeed, p.launchMaxSpeed, charge) * bonus, p.maxSpeed));
-            Pitch = Mathf.Clamp(Mathf.Lerp(0f, p.launchMaxPitch, charge), -p.maxPitchDown, p.maxPitchUp);
-            VerticalSpeed = Mathf.Min(Mathf.Lerp(p.launchRise, p.launchMaxRise, charge) * bonus, p.maxRiseSpeed);
+            float speed = Mathf.Min(Mathf.Lerp(p.launchSpeed, p.launchMaxSpeed, Mathf.Clamp01(plan.power)), p.maxSpeed);
+            Reset(position, yaw, speed);
+
+            if (plan.grade == LaunchGrade.Stumble)
+            {
+                // 발을 헛디뎌 고꾸라짐: 속도는 남지만 높이는 없다
+                Pitch = Mathf.Clamp(p.stumblePitch, -p.maxPitchDown, p.maxPitchUp);
+                VerticalSpeed = 0f;
+                return;
+            }
+
+            float h = Mathf.Clamp01(plan.height);
+            float bonus = plan.grade == LaunchGrade.Perfect ? p.launchPerfectBonus : 1f;
+            Pitch = Mathf.Clamp(Mathf.Lerp(0f, p.launchMaxPitch, h) * bonus, -p.maxPitchDown, p.maxPitchUp);
+            VerticalSpeed = Mathf.Min(Mathf.Lerp(p.launchRise, p.launchMaxRise, h), p.maxRiseSpeed);
         }
-
-        /// <summary>버튼을 누르고 있던 시간 → 도약 게이지 (0~1). 가득 찬 뒤에도 누르고 있으면 다시 줄어든다</summary>
-        public static float ChargeLevel(float heldTime, FlightParams p)
-            => Mathf.PingPong(Mathf.Max(0f, heldTime) / Mathf.Max(0.01f, p.launchChargeTime), 1f);
-
-        public static bool IsPerfectCharge(float level, FlightParams p)
-            => level >= 1f - p.launchPerfectWindow;
 
         /// <summary>현재 속도에서 중력을 상쇄하는 비율 (0~1)</summary>
         public float LiftFraction(float speed)

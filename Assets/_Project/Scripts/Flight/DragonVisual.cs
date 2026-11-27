@@ -9,6 +9,8 @@ namespace DragonRecipe.Flight
         public Transform leftWing;
         public Transform rightWing;
         public Transform tail;
+        [Tooltip("달리기 흔들림/웅크리기에 쓰는 몸통 (비우면 자식 'Model')")]
+        public Transform body;
 
         [Header("각도 (deg, + = 위로)")]
         public float glideAngle = 5f;
@@ -20,6 +22,14 @@ namespace DragonRecipe.Flight
         float _flapT = 1f;
         float _flapStrength = 1f;
         float _current;
+        Vector3 _bodyBase;
+        float _crouch;
+
+        void Awake()
+        {
+            if (!body) body = transform.Find("Model");
+            if (body) _bodyBase = body.localPosition;
+        }
 
         void OnEnable()
         {
@@ -35,10 +45,13 @@ namespace DragonRecipe.Flight
             controller.Launched -= OnLaunched;
         }
 
-        void OnLaunched(float charge, bool perfect)
+        void OnLaunched(LaunchPlan plan)
         {
             _flapT = 0f;
-            _flapStrength = perfect ? 1.5f : Mathf.Lerp(0.8f, 1.3f, charge); // 힘을 모은 만큼 크게 내려친다
+            // 높이 뛸수록 크게 내려친다
+            _flapStrength = plan.grade == LaunchGrade.Perfect ? 1.5f
+                : plan.grade == LaunchGrade.Stumble ? 0.4f
+                : Mathf.Lerp(0.8f, 1.3f, plan.height);
         }
 
         void OnFlapped(FlapOutcome outcome)
@@ -57,12 +70,25 @@ namespace DragonRecipe.Flight
         {
             float target;
             bool flying = controller && controller.IsFlying;
-            if (!flying && controller && controller.IsCharging)
+            var run = !flying && controller ? controller.RunUp : null;
+            var p = controller ? controller.Model?.Params : null;
+            float bob = 0f;
+            float crouchTarget = 0f;
+            if (run != null && p != null && run.IsCrouching)
             {
-                // 힘을 모을수록 날개를 치켜든다. 가득 차면 부르르 떨림
-                float c = controller.Charge;
-                target = Mathf.Lerp(foldedAngle, flapUpAngle + 15f, c);
-                if (controller.ChargeIsPerfect) target += Mathf.Sin(Time.time * 60f) * 4f;
+                // 웅크릴수록 몸을 낮추고 날개를 치켜든다. 끝까지 웅크리면 부르르 떨림
+                float d = run.CrouchDepth(p);
+                crouchTarget = d;
+                target = Mathf.Lerp(foldedAngle, flapUpAngle + 15f, d);
+                if (d >= 1f) target += Mathf.Sin(Time.time * 60f) * 4f;
+            }
+            else if (run != null && p != null && run.Started)
+            {
+                // 달리기: 빠를수록 크게 들썩이고 날개를 반쯤 펴서 퍼덕인다
+                float f = run.PowerFraction(p);
+                float stride = Time.time * Mathf.Lerp(6f, 16f, f);
+                bob = Mathf.Abs(Mathf.Sin(stride)) * 0.18f * f;
+                target = Mathf.Lerp(foldedAngle, glideAngle + 20f, f) + Mathf.Sin(stride * 2f) * 8f * f;
             }
             else if (!flying)
             {
@@ -82,6 +108,8 @@ namespace DragonRecipe.Flight
             }
 
             _current = Mathf.Lerp(_current, target, 12f * Time.deltaTime);
+            _crouch = Mathf.Lerp(_crouch, crouchTarget, 15f * Time.deltaTime);
+            if (body && controller) body.localPosition = _bodyBase + Vector3.up * (bob - 0.35f * _crouch);
             if (leftWing) leftWing.localRotation = Quaternion.Euler(0, 0, _current);
             if (rightWing) rightWing.localRotation = Quaternion.Euler(0, 0, -_current);
             if (tail) tail.localRotation = Quaternion.Euler(Mathf.Sin(Time.time * 4f) * 6f, Mathf.Sin(Time.time * 2.3f) * 10f, 0);
