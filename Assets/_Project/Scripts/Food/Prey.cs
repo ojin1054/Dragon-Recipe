@@ -16,10 +16,17 @@ namespace DragonRecipe.Food
         public int HerdId { get; set; } = -1;
         /// <summary>지금 흩어져 달아나는 중</summary>
         public bool IsScattering => Time.time < _scatterUntil;
+        /// <summary>스킬에 맞아 그 자리에 멈춰 있음 (기절·속박·잠)</summary>
+        public bool IsHeld => Time.time < _heldUntil;
+        /// <summary>불 스킬에 익음: 잡으면 포만도가 더 크다</summary>
+        public bool IsCooked { get; private set; }
+        /// <summary>익힌 먹이 포만도 배율</summary>
+        public const float CookedSatietyMultiplier = 1.5f;
 
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly Color RareColor = new Color(1f, 0.82f, 0.2f);
+        static readonly Color CookedColor = new Color(0.5f, 0.26f, 0.12f);
         public const float RareScale = 1.25f;
 
         Transform _threat;
@@ -33,6 +40,7 @@ namespace DragonRecipe.Food
         float _scale = 1f;
         Vector3 _scatterFrom;
         float _scatterUntil = -1f;
+        float _heldUntil = -1f;
 
         public void Init(FoodData data, PreySpawner spawner, Transform threat, Renderer[] parts = null, GameObject sparkle = null)
         {
@@ -48,6 +56,7 @@ namespace DragonRecipe.Food
             IsRare = rare;
             _scale = rare ? RareScale : 1f;
             transform.localScale = Vector3.one * _scale;
+            IsCooked = false;
             ApplyLook();
 
             _groundY = groundPoint.y;
@@ -56,6 +65,7 @@ namespace DragonRecipe.Food
             _wanderDir = transform.forward;
             _nextTurn = 0f;
             _scatterUntil = -1f;
+            _heldUntil = -1f;
             IsAvailable = true;
             gameObject.SetActive(true);
         }
@@ -68,6 +78,7 @@ namespace DragonRecipe.Food
             if (_parts == null || Data == null) return;
             _block ??= new MaterialPropertyBlock();
             var c = IsRare ? Color.Lerp(Data.color, RareColor, 0.7f) : Data.color;
+            if (IsCooked) c = Color.Lerp(c, CookedColor, 0.6f);
             _block.SetColor(BaseColorId, c);
             _block.SetColor(ColorId, c);
             foreach (var r in _parts)
@@ -88,6 +99,21 @@ namespace DragonRecipe.Food
             _scatterUntil = Time.time + duration;
         }
 
+        /// <summary>duration 동안 그 자리에 멈춘다 (스킬 기절·속박·잠). 이미 멈춰 있으면 더 긴 쪽</summary>
+        public void Hold(float duration)
+        {
+            if (!IsAvailable || duration <= 0f) return;
+            _heldUntil = Mathf.Max(_heldUntil, Time.time + duration);
+        }
+
+        /// <summary>불 스킬에 익는다 (색이 갈색으로)</summary>
+        public void Cook()
+        {
+            if (!IsAvailable || IsCooked) return;
+            IsCooked = true;
+            ApplyLook();
+        }
+
         /// <summary>드래곤을 알아채는 거리 (성장 단계 배율 반영)</summary>
         public float AwarenessRadius => Data ? Data.fleeRadius * (_spawner ? _spawner.awarenessScale : 1f) : 0f;
 
@@ -95,6 +121,7 @@ namespace DragonRecipe.Food
         {
             if (!IsAvailable || Data == null) return;
             if (_sparkle && _sparkle.activeSelf) _sparkle.transform.Rotate(0f, 180f * Time.deltaTime, 0f, Space.World);
+            if (IsHeld) return;
 
             Vector3 move;
             float speed;

@@ -8,14 +8,34 @@ namespace DragonRecipe.Farm
     /// <summary>
     /// 둥지 우리: 농장에 있는 동물을 울타리 안에 풀어놓고 돌아다니게 한다.
     /// 새로 들어온 동물은 톡 튀어나오고, 먹이거나 조합에 넣으면 줄어들며 사라진다.
+    /// 우리를 넓히면(상점 확장 단계) 울타리가 커지고 꾸밈이 늘어난다.
     /// </summary>
     public class FarmPenView : MonoBehaviour
     {
         [Tooltip("우리 바닥 가운데. 동물은 이 높이에 선다")]
         public Transform area;
-        [Tooltip("돌아다닐 수 있는 범위 (가운데에서 x, z 반지름)")]
-        public Vector2 halfSize = new Vector2(3.4f, 2.9f);
         public Material animalMaterial;
+        [Tooltip("울타리·꾸밈 재질 (비우면 동물 재질을 쓴다). 색은 부분마다 따로 칠한다")]
+        public Material penMaterial;
+
+        [Header("확장 단계 (0 = 처음, 상점에서 넓힐 때마다 다음 단계)")]
+        public List<PenLevel> levels = new List<PenLevel>
+        {
+            new PenLevel { half = new Vector2(2.6f, 2.1f), rails = 1, hay = true },
+            new PenLevel { half = new Vector2(3.3f, 2.7f), rails = 2, hay = true, trough = true },
+            new PenLevel { half = new Vector2(4.1f, 3.4f), rails = 2, paintedRails = true, gate = true, hay = true, trough = true },
+            new PenLevel { half = new Vector2(5f, 4.1f), rails = 2, paintedRails = true, stoneBase = true, gate = true, hay = true,
+                trough = true, shed = true, flowers = true, lanterns = true }
+        };
+        [Tooltip("동물이 울타리에서 떨어져 다니는 거리")]
+        public float roamMargin = 0.6f;
+
+        [Header("농장을 열었을 때 카메라 자리 (우리 크기에 맞춰 옮김)")]
+        public Transform cameraSpot;
+        [Tooltip("우리 가로 반지름 4일 때의 카메라 위치 (우리 가운데 기준). 우리가 크면 그만큼 멀어진다")]
+        public Vector3 cameraOffset = new Vector3(6f, 7.5f, -12f);
+        [Tooltip("우리를 화면 왼쪽에 두려고 오른쪽으로 돌리는 각도")]
+        public float cameraYaw = 16f;
         [Tooltip("사냥터의 먹이보다 작게 (우리 크기에 맞춤)")]
         public float animalScale = 0.7f;
         public float walkSpeed = 0.9f;
@@ -46,6 +66,13 @@ namespace DragonRecipe.Farm
         MaterialPropertyBlock _block;
         bool _first = true;
         float _nextSync;
+        int _builtLevel = -1;
+        Transform _art;
+        float _artPop = 1f;
+        Vector2 _roam = new Vector2(2f, 1.5f);
+
+        /// <summary>지금 우리 단계 (levels 범위로 자름)</summary>
+        public PenLevel CurrentLevel => levels.Count == 0 ? null : levels[Mathf.Clamp(_builtLevel, 0, levels.Count - 1)];
 
         void OnEnable() => DragonCare.FarmChanged += Sync;
         void OnDisable() => DragonCare.FarmChanged -= Sync;
@@ -62,6 +89,11 @@ namespace DragonRecipe.Farm
             }
 
             float dt = Time.deltaTime;
+            if (_art && _artPop < 1f)
+            {
+                _artPop = Mathf.Min(1f, _artPop + dt * 2.2f);
+                _art.localScale = Vector3.one * Pop(_artPop);
+            }
             _gone.Clear();
             foreach (var a in _animals.Values)
             {
@@ -125,7 +157,33 @@ namespace DragonRecipe.Farm
         {
             var right = area ? area.right : Vector3.right;
             var fwd = area ? area.forward : Vector3.forward;
-            return center + right * Random.Range(-halfSize.x, halfSize.x) + fwd * Random.Range(-halfSize.y, halfSize.y);
+            return center + right * Random.Range(-_roam.x, _roam.x) + fwd * Random.Range(-_roam.y, _roam.y);
+        }
+
+        // ───────────── 우리 짓기 ─────────────
+
+        void BuildPen(int level)
+        {
+            if (levels.Count == 0) return;
+            bool grew = _builtLevel >= 0 && level > _builtLevel;
+            _builtLevel = level;
+            var lv = CurrentLevel;
+            if (_art) Destroy(_art.gameObject);
+            _art = FarmPenArt.Build(area ? area : transform, lv, penMaterial ? penMaterial : animalMaterial, 1234 + level);
+            _roam = new Vector2(Mathf.Max(0.5f, lv.half.x - roamMargin), Mathf.Max(0.5f, lv.half.y - roamMargin));
+            // 넓어지는 순간: 울타리가 톡 튀어나오며 새 모습으로
+            _artPop = grew ? 0f : 1f;
+            _art.localScale = Vector3.one * (grew ? 0.01f : 1f);
+            PlaceCamera(lv);
+        }
+
+        void PlaceCamera(PenLevel lv)
+        {
+            if (!cameraSpot) return;
+            var center = Center;
+            float k = Mathf.Max(0.75f, lv.half.x / 4f);
+            cameraSpot.position = center + cameraOffset * k;
+            cameraSpot.rotation = Quaternion.Euler(0f, cameraYaw, 0f) * Quaternion.LookRotation(center - cameraSpot.position, Vector3.up);
         }
 
         // ───────────── 농장 상태 맞추기 ─────────────
@@ -133,6 +191,7 @@ namespace DragonRecipe.Farm
         void Sync()
         {
             if (!DragonCare.IsLoaded || DragonCare.Farm == null) return;
+            if (DragonCare.Farm.penUpgradeLevel != _builtLevel) BuildPen(DragonCare.Farm.penUpgradeLevel);
             var animals = DragonCare.Farm.animals;
             var alive = new HashSet<string>();
             foreach (var a in animals)
@@ -234,7 +293,8 @@ namespace DragonRecipe.Farm
         {
             var c = Center;
             Gizmos.color = Color.yellow;
-            Gizmos.DrawWireCube(c, new Vector3(halfSize.x * 2f, 0.1f, halfSize.y * 2f));
+            foreach (var lv in levels)
+                Gizmos.DrawWireCube(c, new Vector3(lv.half.x * 2f, 0.1f, lv.half.y * 2f));
         }
     }
 }

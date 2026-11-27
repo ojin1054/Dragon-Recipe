@@ -217,7 +217,8 @@ namespace DragonRecipe.Core
             Result.caught.Add(new CaughtFood
             {
                 food = prey.Data,
-                satiety = prey.Data.satiety * mult * (rare ? hunt.rareSatietyMultiplier : 1f),
+                satiety = prey.Data.satiety * mult * (rare ? hunt.rareSatietyMultiplier : 1f)
+                          * (prey.IsCooked ? Prey.CookedSatietyMultiplier : 1f), // 불 스킬로 익힌 먹이
                 nearMiss = nearMiss,
                 rare = rare,
                 combo = CurrentCombo

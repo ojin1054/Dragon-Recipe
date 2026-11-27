@@ -256,13 +256,14 @@ namespace DragonRecipe.EditorTools
             EditorSceneManager.SaveScene(scene, NestScenePath);
         }
 
-        /// <summary>우리 가운데. 절벽 왼쪽에 붙인 바위 언덕 위 (동굴과 겹치지 않게)</summary>
-        static readonly Vector3 PenCenter = new Vector3(-14.5f, CliffHeight, -1f);
-        static readonly Vector2 PenHalf = new Vector2(4f, 3.5f);
+        /// <summary>우리 가운데. 절벽 왼쪽에 붙인 바위 언덕 위 (가장 큰 우리도 동굴과 겹치지 않게)</summary>
+        static readonly Vector3 PenCenter = new Vector3(-15.5f, CliffHeight, -1f);
+        /// <summary>가장 크게 넓힌 우리의 반지름 (FarmPenView 마지막 단계와 맞춤). 언덕은 이 크기로 만든다</summary>
+        static readonly Vector2 PenMaxHalf = new Vector2(5f, 4.1f);
 
         /// <summary>
-        /// 동물 농장 우리: 바위 언덕 + 풀밭 + 나무 울타리. 잡아 온 동물은 FarmPenView가 안에 풀어놓는다.
-        /// 농장을 열었을 때의 카메라 자리를 돌려준다.
+        /// 동물 농장 우리 자리: 바위 언덕만 만든다. 울타리와 꾸밈은 FarmPenView가 확장 단계에 맞춰 실행 중에 짓고,
+        /// 잡아 온 동물도 그 안에 풀어놓는다. 농장을 열었을 때의 카메라 자리를 돌려준다.
         /// </summary>
         static Transform BuildFarmPen(Transform world, Mats mats)
         {
@@ -270,53 +271,20 @@ namespace DragonRecipe.EditorTools
             pen.SetParent(world, false);
             pen.position = PenCenter;
 
-            // 언덕: 절벽과 동굴 바닥에 이어 붙는다
-            Prim(PrimitiveType.Cube, "PenHill", pen, PenCenter + new Vector3(0.5f, -CliffHeight * 0.5f, 0f),
-                new Vector3(PenHalf.x * 2f + 5f, CliffHeight, PenHalf.y * 2f + 5f), mats.Rock);
-            Prim(PrimitiveType.Cube, "PenGrass", pen, PenCenter + new Vector3(0f, 0.03f, 0f),
-                new Vector3(PenHalf.x * 2f + 1.2f, 0.06f, PenHalf.y * 2f + 1.2f), mats.Grass, keepCollider: false);
+            // 언덕: 절벽과 동굴 바닥에 이어 붙는다 (가장 큰 우리 + 둘레 여유)
+            Prim(PrimitiveType.Cube, "PenHill", pen, PenCenter + new Vector3(0.8f, -CliffHeight * 0.5f, 0f),
+                new Vector3(PenMaxHalf.x * 2f + 4f, CliffHeight, PenMaxHalf.y * 2f + 4f), mats.Rock);
 
-            // 울타리: 기둥 + 가로대 두 줄
-            var fence = new GameObject("Fence").transform;
-            fence.SetParent(pen, false);
-            const float postH = 1.1f, step = 1.35f;
-            Vector3[] corners =
-            {
-                PenCenter + new Vector3(-PenHalf.x, 0, -PenHalf.y), PenCenter + new Vector3(PenHalf.x, 0, -PenHalf.y),
-                PenCenter + new Vector3(PenHalf.x, 0, PenHalf.y), PenCenter + new Vector3(-PenHalf.x, 0, PenHalf.y)
-            };
-            for (int side = 0; side < 4; side++)
-            {
-                var a = corners[side];
-                var b = corners[(side + 1) % 4];
-                float len = Vector3.Distance(a, b);
-                int posts = Mathf.Max(1, Mathf.RoundToInt(len / step));
-                for (int i = 0; i < posts; i++)
-                {
-                    var p = Vector3.Lerp(a, b, i / (float)posts);
-                    Prim(PrimitiveType.Cube, $"Post_{side}_{i}", fence, p + Vector3.up * (postH * 0.5f),
-                        new Vector3(0.22f, postH, 0.22f), mats.Bark, keepCollider: false);
-                }
-                var mid = (a + b) * 0.5f;
-                var rot = Quaternion.LookRotation(b - a, Vector3.up);
-                foreach (float h in new[] { 0.45f, 0.85f })
-                {
-                    var rail = Prim(PrimitiveType.Cube, $"Rail_{side}_{h}", fence, mid + Vector3.up * h,
-                        new Vector3(0.1f, 0.12f, len + 0.2f), mats.Nest, keepCollider: false);
-                    rail.transform.rotation = rot;
-                }
-            }
-
-            var view = pen.gameObject.AddComponent<DragonRecipe.Farm.FarmPenView>();
-            view.area = pen;
-            view.halfSize = PenHalf - new Vector2(0.6f, 0.6f);
-            view.animalMaterial = mats.Prey;
-
-            // 농장을 열면: 우리를 화면 왼쪽에 두고(오른쪽은 농장 화면), 위에서 비스듬히 내려다본다
             var camSpot = new GameObject("FarmCameraView").transform;
             camSpot.SetParent(pen, false);
             camSpot.position = PenCenter + new Vector3(6f, 7.5f, -12f);
             camSpot.rotation = Quaternion.Euler(0f, 16f, 0f) * Quaternion.LookRotation(PenCenter - camSpot.position, Vector3.up);
+
+            var view = pen.gameObject.AddComponent<DragonRecipe.Farm.FarmPenView>();
+            view.area = pen;
+            view.animalMaterial = mats.Prey;
+            view.penMaterial = mats.Prey;
+            view.cameraSpot = camSpot;
             return camSpot;
         }
 
