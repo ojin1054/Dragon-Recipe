@@ -379,6 +379,79 @@ namespace DragonRecipe.Care
             Save();
         }
 
+        // ───────────── 개발자 모드 ─────────────
+
+        const string DevBackupKey = "DragonRecipe.DevBackup";
+
+        /// <summary>개발자 모드로 드래곤을 바꿔 둔 상태 (원래 드래곤이 백업돼 있음)</summary>
+        public static bool DevModeActive => PlayerPrefs.HasKey(DevBackupKey);
+
+        /// <summary>
+        /// 개발자 모드: 지금 드래곤을 처음 한 번 백업해 두고, 원하는 성장 단계·주 성질·성체 모습으로 바꾼다.
+        /// 포만도는 가득, 부상은 낫는다. 농장·종족·도감은 그대로 둔다.
+        /// </summary>
+        public static void DevSetDragon(GrowthStage stage, FoodTrait trait, DragonForm form = DragonForm.None)
+        {
+            if (!IsLoaded) return;
+            if (!DevModeActive)
+            {
+                PlayerPrefs.SetString(DevBackupKey, JsonUtility.ToJson(State));
+                PlayerPrefs.Save();
+            }
+            var c = Config.care;
+            State.stage = stage;
+            State.growthXp = stage switch
+            {
+                GrowthStage.Adult => c.xpToAdult,
+                GrowthStage.Juvenile => c.xpToJuvenile,
+                _ => 0f
+            };
+            State.traits.Clear();
+            if (stage == GrowthStage.Adult && form == DragonForm.Prism)
+            {
+                // 골고루 먹은 드래곤
+                foreach (FoodTrait t in Enum.GetValues(typeof(FoodTrait))) State.AddTrait(t, 25f);
+            }
+            else if (stage != GrowthStage.Hatchling) // 새끼는 아직 아무것도 안 먹은 상태
+            {
+                if (stage == GrowthStage.Adult && form != DragonForm.None) trait = FormTrait(form, trait);
+                State.AddTrait(trait, 100f);
+            }
+            State.form = stage == GrowthStage.Adult ? (form == DragonForm.None ? CareLogic.FormFor(State, c) : form) : DragonForm.None;
+            if (State.form != DragonForm.None && !State.codexForms.Contains(State.form)) State.codexForms.Add(State.form);
+            State.hunger = c.maxHunger;
+            State.injured = false;
+            Save();
+            StageChanged?.Invoke(State.stage);
+        }
+
+        static FoodTrait FormTrait(DragonForm form, FoodTrait fallback) => form switch
+        {
+            DragonForm.Hunter => FoodTrait.Meat,
+            DragonForm.Tide => FoodTrait.Fish,
+            DragonForm.Ember => FoodTrait.Fire,
+            DragonForm.Grove => FoodTrait.Plant,
+            _ => fallback
+        };
+
+        /// <summary>개발자 모드를 끝내고 백업해 둔 원래 드래곤으로 되돌린다</summary>
+        public static void DevRestore()
+        {
+            if (!DevModeActive || Config == null) return;
+            var json = PlayerPrefs.GetString(DevBackupKey);
+            PlayerPrefs.DeleteKey(DevBackupKey);
+            PlayerPrefs.Save();
+            DragonState s = null;
+            try { s = JsonUtility.FromJson<DragonState>(json); }
+            catch (Exception) { /* 백업이 깨졌으면 지금 드래곤을 그대로 둔다 */ }
+            if (s == null) return;
+            Migrate(s);
+            State = s;
+            Tick();
+            Save();
+            StageChanged?.Invoke(State.stage);
+        }
+
         // 도메인 리로드를 꺼도 Play마다 새로 읽게
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()

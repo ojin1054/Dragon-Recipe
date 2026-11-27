@@ -15,7 +15,7 @@ namespace DragonRecipe.Hostile
     /// 프리미티브로만 만든 자리표시용이고 콜라이더가 없어 드래곤 충돌 판정에 걸리지 않는다.
     /// 씬에 없으면 비행 씬(FlightSession)이 열릴 때 스스로 붙는다.
     /// </summary>
-    public class HostileSpawner : MonoBehaviour
+    public partial class HostileSpawner : MonoBehaviour
     {
         public FlightSession session;
         [Tooltip("배치 구역을 따라갈 먹이 스포너 (비우면 session.spawner)")]
@@ -125,6 +125,7 @@ namespace DragonRecipe.Hostile
             foreach (var a in _arrows)
                 if (a.t) Destroy(a.t.gameObject);
             _arrows.Clear();
+            ResetSkillStatus();
             foreach (var h in _hunters)
             {
                 h.root.position = new Vector3(h.home.x, h.groundY, h.home.z);
@@ -153,8 +154,16 @@ namespace DragonRecipe.Hostile
             Vector3 targetVel = dragon ? dragon.Model.Velocity : Vector3.zero;
             float hitRadius = dragon ? dragon.collisionRadius * dragon.transform.localScale.x + 0.5f : 1f;
 
-            foreach (var h in _hunters) UpdateHunter(h, dt, active, target, targetVel);
-            foreach (var m in _monsters) UpdateMonster(m, dt, active, dragon, target, hitRadius);
+            foreach (var h in _hunters)
+            {
+                float hd = dt;
+                if (!SkillHoldHunter(h, ref hd)) UpdateHunter(h, hd, active, target, targetVel); // 스킬 기절·잠·쓰러짐·둔화
+            }
+            foreach (var m in _monsters)
+            {
+                float md = dt;
+                if (!SkillHoldMonster(m, ref md)) UpdateMonster(m, md, active, dragon, target, hitRadius);
+            }
             UpdateArrows(dt, active, dragon, target, hitRadius);
         }
 
