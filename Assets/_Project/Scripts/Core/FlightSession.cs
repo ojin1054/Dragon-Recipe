@@ -6,7 +6,7 @@ using UnityEngine;
 namespace DragonRecipe.Core
 {
     /// <summary>
-    /// 비행 한 판의 흐름: 둥지 대기 → (날갯짓으로) 이륙 → 비행 → 착지/추락 → 결과.
+    /// 비행 한 판의 흐름: 둥지 대기 → (날갯짓을 꾹 눌러 힘을 모았다가 떼면) 이륙 → 비행 → 착지/추락 → 결과.
     /// </summary>
     public class FlightSession : MonoBehaviour
     {
@@ -68,7 +68,15 @@ namespace DragonRecipe.Core
             switch (Current)
             {
                 case State.Ready:
-                    if (input && input.ConsumeFlap()) Launch();
+                    if (!dragon.IsCharging)
+                    {
+                        if (input && input.ConsumeFlap()) dragon.BeginCharge();
+                    }
+                    else
+                    {
+                        dragon.TickCharge(Time.deltaTime);
+                        if (!input || !input.FlapHeld) Launch(); // 버튼을 떼는 순간 도약
+                    }
                     break;
                 case State.Flying:
                     Result.airtime += Time.deltaTime;
@@ -90,12 +98,18 @@ namespace DragonRecipe.Core
             SetState(State.Ready);
         }
 
+        /// <summary>모은 힘만큼 도약 (힘을 안 모았으면 그냥 출발)</summary>
         void Launch()
         {
-            dragon.Launch();
+            float charge = dragon.Charge;
+            bool perfect = dragon.ChargeIsPerfect;
+            dragon.Launch(charge, perfect);
             if (snatchZone) snatchZone.Armed = true;
             SetState(State.Flying);
-            Feedback?.Invoke(dragon.Model.Params.needsFlapping ? "리듬에 맞춰 날갯짓!" : "날아올라!", Info);
+
+            if (perfect) Feedback?.Invoke("완벽한 도약!", Good);
+            else if (charge >= 0.5f) Feedback?.Invoke("힘찬 도약!", Info);
+            else Feedback?.Invoke(dragon.Model.Params.needsFlapping ? "리듬에 맞춰 날갯짓!" : "날아올라!", Info);
         }
 
         void OnFlapped(FlapOutcome outcome)

@@ -578,7 +578,8 @@ namespace DragonRecipe.EditorTools
             fill.fillMethod = Image.FillMethod.Horizontal;
             fill.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
             hud.staminaFill = fill;
-            MakeText(barBg.transform, "Label", new Vector2(0.5f, 0.5f), new Vector2(0, -36), new Vector2(400, 40), 24, TextAnchor.MiddleCenter).text = "스태미나";
+            hud.staminaLabel = MakeText(barBg.transform, "Label", new Vector2(0.5f, 0.5f), new Vector2(0, -36), new Vector2(400, 40), 24, TextAnchor.MiddleCenter);
+            hud.staminaLabel.text = "스태미나";
 
             hud.promptText = MakeText(ct, "Prompt", new Vector2(0.5f, 0.5f), new Vector2(0, -120), new Vector2(1400, 140), 40, TextAnchor.MiddleCenter);
             hud.feedbackText = MakeText(ct, "Feedback", new Vector2(0.5f, 0.5f), new Vector2(0, 160), new Vector2(1400, 90), 56, TextAnchor.MiddleCenter);
