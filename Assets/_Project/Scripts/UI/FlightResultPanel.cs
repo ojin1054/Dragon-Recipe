@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text;
+using DragonRecipe.Care;
 using DragonRecipe.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -15,6 +16,7 @@ namespace DragonRecipe.UI
         public Text titleText;
         public Text bodyText;
         public Button retryButton;
+        public Button nestButton;
         [Tooltip("결과 화면이 뜨기까지의 지연 (충돌 연출을 보여주려고)")]
         public float showDelay = 1.2f;
 
@@ -23,6 +25,7 @@ namespace DragonRecipe.UI
         void Awake()
         {
             if (retryButton) retryButton.onClick.AddListener(OnRetry);
+            if (nestButton) nestButton.onClick.AddListener(SceneFlow.GoToNest);
             if (panel) panel.SetActive(false);
         }
 
@@ -107,7 +110,14 @@ namespace DragonRecipe.UI
                     sb.AppendLine($"포만도 합계  {r.TotalSatiety:0}");
                 }
 
-                if (r.Injured)
+                // 드래곤 상태에 반영된 결과 (먹이 섭취 / 성장 / 부상)
+                var report = DragonCare.LastFlightReport;
+                if (report != null)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine(report.Describe());
+                }
+                else if (r.Injured)
                 {
                     sb.AppendLine();
                     sb.AppendLine("<color=#ff8877>부상 상태 — 치료가 필요해요 (상점은 다음 단계에서)</color>");

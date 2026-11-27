@@ -1,3 +1,4 @@
+using DragonRecipe.Care;
 using DragonRecipe.Core;
 using DragonRecipe.Flight;
 using UnityEngine;
@@ -21,6 +22,8 @@ namespace DragonRecipe.UI
         public Button invertButton;
         public Text invertLabel;
         public Button restartButton;
+        [Tooltip("비행을 포기하고 둥지 씬으로 (잡은 먹이는 사라짐)")]
+        public Button nestButton;
 
         void Awake()
         {
@@ -28,6 +31,7 @@ namespace DragonRecipe.UI
             if (resumeButton) resumeButton.onClick.AddListener(() => GamePause.Set(false));
             if (invertButton) invertButton.onClick.AddListener(ToggleInvert);
             if (restartButton) restartButton.onClick.AddListener(Restart);
+            if (nestButton) nestButton.onClick.AddListener(SceneFlow.GoToNest);
             if (panel) panel.SetActive(false);
         }
 

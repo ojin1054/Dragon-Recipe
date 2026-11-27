@@ -1,5 +1,6 @@
 using System.IO;
 using DragonRecipe.CameraRig;
+using DragonRecipe.Care;
 using DragonRecipe.Core;
 using DragonRecipe.Flight;
 using DragonRecipe.Food;
@@ -16,8 +17,9 @@ using UnityEngine.UI;
 namespace DragonRecipe.EditorTools
 {
     /// <summary>
-    /// 메뉴 "Dragon Recipe/Build Flight Prototype Scene" 한 번으로
-    /// 데이터 에셋, 머티리얼, 프리미티브 월드, 드래곤, UI가 들어간 테스트 씬을 만든다.
+    /// 메뉴 "Dragon Recipe/Build All Scenes" 한 번으로
+    /// 데이터 에셋, 머티리얼, 둥지 씬, 비행 씬(프리미티브 월드, 드래곤, UI)을 만든다.
+    /// 이미 있는 데이터 에셋(Stage_*, Food_*, GameConfig)은 덮어쓰지 않는다.
     /// (배치 모드: -executeMethod DragonRecipe.EditorTools.PrototypeSceneBuilder.Build)
     /// </summary>
     public static class PrototypeSceneBuilder
@@ -26,10 +28,11 @@ namespace DragonRecipe.EditorTools
         const string DataDir = Root + "/Data";
         const string MatDir = Root + "/Art/Materials";
         const string ScenePath = Root + "/Scenes/FlightPrototype.unity";
+        const string NestScenePath = Root + "/Scenes/Nest.unity";
 
         const float CliffHeight = 24f;
 
-        [MenuItem("Dragon Recipe/Build Flight Prototype Scene")]
+        [MenuItem("Dragon Recipe/Build All Scenes")]
         public static void Build()
         {
             Directory.CreateDirectory(DataDir);
@@ -38,6 +41,7 @@ namespace DragonRecipe.EditorTools
 
             var stages = CreateStages();
             var foods = CreateFoods();
+            var config = CreateGameConfig(stages);
             var mats = new Mats();
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -64,6 +68,11 @@ namespace DragonRecipe.EditorTools
             session.spawner = spawner;
             session.nest = nest;
 
+            var bridge = sessionGo.AddComponent<FlightCareBridge>();
+            bridge.config = config;
+            bridge.dragon = dragon;
+            bridge.session = session;
+
             var camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";
             var cam = camGo.AddComponent<Camera>();
@@ -78,9 +87,148 @@ namespace DragonRecipe.EditorTools
             BuildUI(session, dragon, input);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+
+            BuildNestScene(config, stages[0], mats);
+
+            // 둥지가 첫 화면
+            EditorBuildSettings.scenes = new[]
+            {
+                new EditorBuildSettingsScene(NestScenePath, true),
+                new EditorBuildSettingsScene(ScenePath, true)
+            };
             AssetDatabase.SaveAssets();
-            Debug.Log($"[Dragon Recipe] 씬 생성 완료: {ScenePath}");
+            Debug.Log($"[Dragon Recipe] 씬 생성 완료: {NestScenePath}, {ScenePath}");
+        }
+
+        static GameConfig CreateGameConfig(DragonStageData[] stages)
+        {
+            var cfg = LoadOrCreate<GameConfig>($"{DataDir}/GameConfig.asset", out bool created);
+            if (created) cfg.care = new CareSettings();
+            if (created || cfg.stages == null || cfg.stages.Length == 0) cfg.stages = stages;
+            cfg.nestScene = Path.GetFileNameWithoutExtension(NestScenePath);
+            cfg.flightScene = Path.GetFileNameWithoutExtension(ScenePath);
+            EditorUtility.SetDirty(cfg);
+            return cfg;
+        }
+
+        // ───────────────────────── 둥지 씬 ─────────────────────────
+
+        static void BuildNestScene(GameConfig config, DragonStageData stage, Mats mats)
+        {
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            BuildLighting();
+            RenderSettings.fogStartDistance = 80f;
+            RenderSettings.fogEndDistance = 400f;
+
+            var world = new GameObject("World").transform;
+            var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            ground.name = "Ground";
+            ground.transform.SetParent(world);
+            ground.transform.localScale = new Vector3(60, 1, 60);
+            ground.GetComponent<Renderer>().sharedMaterial = mats.Grass;
+            Prim(PrimitiveType.Cube, "Cliff", world, new Vector3(0, CliffHeight * 0.5f, -2f), new Vector3(14, CliffHeight, 16), mats.Rock)
+                .transform.rotation = Quaternion.Euler(0, 8, 0);
+            Prim(PrimitiveType.Cylinder, "NestRing", world, new Vector3(0, CliffHeight + 0.15f, 0), new Vector3(4f, 0.3f, 4f), mats.Nest, keepCollider: false);
+            var rng = new System.Random(77);
+            for (int i = 0; i < 40; i++)
+            {
+                var p = new Vector3(Range(rng, -150, 150), 0, Range(rng, -150, 150));
+                if (new Vector2(p.x, p.z).magnitude < 20f) continue;
+                float h = Range(rng, 5f, 11f);
+                Prim(PrimitiveType.Cylinder, $"Trunk_{i}", world, p + Vector3.up * (h * 0.5f), new Vector3(0.7f, h * 0.5f, 0.7f), mats.Bark);
+                Prim(PrimitiveType.Sphere, $"Crown_{i}", world, p + Vector3.up * (h + 1.5f), Vector3.one * Range(rng, 3.5f, 6f), mats.Leaf);
+            }
+
+            // 둥지 드래곤: 비행용 드래곤을 만든 뒤 비행 관련 컴포넌트를 떼어 낸다 (외형만 재사용)
+            var flyer = BuildDragon(stage, mats, out var input, out var snatch);
+            var dragonGo = flyer.gameObject;
+            dragonGo.name = "NestDragon";
+            Object.DestroyImmediate(snatch.gameObject);
+            Object.DestroyImmediate(flyer);
+            Object.DestroyImmediate(input);
+            Object.DestroyImmediate(dragonGo.GetComponent<Rigidbody>());
+            dragonGo.transform.position = new Vector3(0, CliffHeight + 0.75f, 0);
+            dragonGo.transform.rotation = Quaternion.Euler(0, 155f, 0);
+            var view = dragonGo.AddComponent<NestDragonView>();
+            view.model = dragonGo.transform.Find("Model");
+
+            var camGo = new GameObject("Main Camera");
+            camGo.tag = "MainCamera";
+            var cam = camGo.AddComponent<Camera>();
+            cam.farClipPlane = 1000f;
+            cam.fieldOfView = 50f;
+            camGo.AddComponent<AudioListener>();
+            camGo.transform.position = new Vector3(5.5f, CliffHeight + 5.5f, -11f);
+            camGo.transform.LookAt(new Vector3(-1.5f, CliffHeight + 1.5f, 0));
+
+            BuildNestUI(config);
+            EditorSceneManager.SaveScene(scene, NestScenePath);
+        }
+
+        static void BuildNestUI(GameConfig config)
+        {
+            var es = new GameObject("EventSystem");
+            es.AddComponent<EventSystem>();
+            es.AddComponent<InputSystemUIInputModule>();
+
+            var canvasGo = new GameObject("Canvas");
+            var canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            var scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
+            canvasGo.AddComponent<GraphicRaycaster>();
+            var ct = canvasGo.transform;
+
+            var ui = canvasGo.AddComponent<NestUI>();
+            ui.config = config;
+
+            var panel = MakeImage(ct, "StatusPanel", new Vector2(0, 1), new Vector2(40, -40), new Vector2(760, 470), new Color(0.08f, 0.1f, 0.14f, 0.75f));
+            panel.rectTransform.pivot = new Vector2(0, 1);
+            var pt = panel.transform;
+
+            ui.titleText = MakeText(pt, "Title", new Vector2(0, 1), new Vector2(30, -25), new Vector2(700, 70), 46, TextAnchor.UpperLeft);
+            ui.titleText.rectTransform.pivot = new Vector2(0, 1);
+
+            ui.hungerFill = MakeBar(pt, "HungerBar", new Vector2(30, -120), out ui.hungerLabel);
+            ui.growthFill = MakeBar(pt, "GrowthBar", new Vector2(30, -215), out ui.growthLabel);
+            ui.growthFill.color = new Color(1f, 0.8f, 0.35f);
+
+            ui.statusText = MakeText(pt, "Status", new Vector2(0, 1), new Vector2(30, -300), new Vector2(700, 150), 30, TextAnchor.UpperLeft);
+            ui.statusText.rectTransform.pivot = new Vector2(0, 1);
+
+            ui.reportText = MakeText(ct, "Report", new Vector2(0, 0), new Vector2(40, 40), new Vector2(1000, 240), 30, TextAnchor.LowerLeft);
+            ui.reportText.rectTransform.pivot = new Vector2(0, 0);
+
+            ui.flyButton = MakeButton(ct, "FlyButton", new Vector2(1, 0), new Vector2(-230, 120), new Vector2(380, 140),
+                "비행 나가기", new Color(1f, 0.75f, 0.35f), new Color(0.15f, 0.1f, 0.05f), out var flyLabel);
+            flyLabel.fontSize = 52;
+
+            var debug = new GameObject("Debug", typeof(RectTransform));
+            debug.transform.SetParent(ct, false);
+            Stretch(debug.GetComponent<RectTransform>());
+            var dbgColor = new Color(1f, 1f, 1f, 0.25f);
+            ui.debugAdvanceButton = MakeButton(debug.transform, "Advance1h", new Vector2(1, 1), new Vector2(-170, -60), new Vector2(300, 70),
+                "[디버그] +1시간", dbgColor, Color.white, out var advLabel);
+            advLabel.fontSize = 28;
+            ui.debugResetButton = MakeButton(debug.transform, "ResetSave", new Vector2(1, 1), new Vector2(-170, -145), new Vector2(300, 70),
+                "저장 초기화", dbgColor, Color.white, out ui.debugResetLabel);
+            ui.debugResetLabel.fontSize = 28;
+            ui.debugRoot = debug;
+        }
+
+        static Image MakeBar(Transform parent, string name, Vector2 pos, out Text label)
+        {
+            label = MakeText(parent, name + "Label", new Vector2(0, 1), pos, new Vector2(700, 40), 28, TextAnchor.UpperLeft);
+            label.rectTransform.pivot = new Vector2(0, 1);
+            var bg = MakeImage(parent, name, new Vector2(0, 1), pos + new Vector2(0, -42), new Vector2(700, 30), new Color(0, 0, 0, 0.5f));
+            bg.rectTransform.pivot = new Vector2(0, 1);
+            var fill = MakeImage(bg.transform, "Fill", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(692, 22), new Color(0.55f, 0.85f, 0.4f));
+            fill.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            return fill;
         }
 
         // ───────────────────────── 데이터 ─────────────────────────
@@ -466,7 +614,7 @@ namespace DragonRecipe.EditorTools
             result.titleText = MakeText(resultPanel.transform, "Title", new Vector2(0.5f, 1), new Vector2(0, -70), new Vector2(860, 90), 52, TextAnchor.MiddleCenter);
             result.bodyText = MakeText(resultPanel.transform, "Body", new Vector2(0.5f, 0.5f), new Vector2(0, 10), new Vector2(780, 400), 32, TextAnchor.UpperLeft);
 
-            var btnImg = MakeImage(resultPanel.transform, "RetryButton", new Vector2(0.5f, 0), new Vector2(0, 80), new Vector2(360, 100), new Color(1f, 0.75f, 0.35f));
+            var btnImg = MakeImage(resultPanel.transform, "RetryButton", new Vector2(0.5f, 0), new Vector2(-190, 80), new Vector2(340, 100), new Color(1f, 0.75f, 0.35f));
             btnImg.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
             btnImg.type = Image.Type.Sliced;
             var btn = btnImg.gameObject.AddComponent<Button>();
@@ -475,6 +623,8 @@ namespace DragonRecipe.EditorTools
             label.text = "다시 날기";
             label.color = new Color(0.15f, 0.1f, 0.05f);
             result.retryButton = btn;
+            result.nestButton = MakeButton(resultPanel.transform, "NestButton", new Vector2(0.5f, 0), new Vector2(190, 80), new Vector2(340, 100),
+                "둥지로 돌아가기", new Color(0.55f, 0.8f, 1f), new Color(0.05f, 0.1f, 0.15f), out _);
             resultPanel.gameObject.SetActive(false);
 
             BuildPauseMenu(canvasGo, ct, session, input);
@@ -493,15 +643,16 @@ namespace DragonRecipe.EditorTools
             // 메뉴 패널 (반투명 전체 화면 배경 + 가운데 상자)
             var dim = MakeImage(ct, "PauseMenu", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(0, 0, 0, 0.55f));
             Stretch(dim.rectTransform);
-            var box = MakeImage(dim.transform, "Box", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(720, 620), new Color(0.08f, 0.1f, 0.14f, 0.92f));
+            var box = MakeImage(dim.transform, "Box", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(720, 760), new Color(0.08f, 0.1f, 0.14f, 0.92f));
             var title = MakeText(box.transform, "Title", new Vector2(0.5f, 1), new Vector2(0, -70), new Vector2(680, 90), 56, TextAnchor.MiddleCenter);
             title.text = "일시정지";
 
             var btnColor = new Color(1f, 0.75f, 0.35f);
             var textColor = new Color(0.15f, 0.1f, 0.05f);
-            menu.resumeButton = MakeButton(box.transform, "Resume", new Vector2(0.5f, 0.5f), new Vector2(0, 90), new Vector2(480, 100), "계속하기", btnColor, textColor, out _);
-            menu.invertButton = MakeButton(box.transform, "InvertPitch", new Vector2(0.5f, 0.5f), new Vector2(0, -35), new Vector2(480, 100), "상/하 반전: 꺼짐", btnColor, textColor, out menu.invertLabel);
-            menu.restartButton = MakeButton(box.transform, "Restart", new Vector2(0.5f, 0.5f), new Vector2(0, -160), new Vector2(480, 100), "둥지로 돌아가기", btnColor, textColor, out _);
+            menu.resumeButton = MakeButton(box.transform, "Resume", new Vector2(0.5f, 0.5f), new Vector2(0, 170), new Vector2(480, 100), "계속하기", btnColor, textColor, out _);
+            menu.invertButton = MakeButton(box.transform, "InvertPitch", new Vector2(0.5f, 0.5f), new Vector2(0, 50), new Vector2(480, 100), "상/하 반전: 꺼짐", btnColor, textColor, out menu.invertLabel);
+            menu.restartButton = MakeButton(box.transform, "Restart", new Vector2(0.5f, 0.5f), new Vector2(0, -70), new Vector2(480, 100), "처음부터 다시 날기", btnColor, textColor, out _);
+            menu.nestButton = MakeButton(box.transform, "GiveUp", new Vector2(0.5f, 0.5f), new Vector2(0, -190), new Vector2(480, 100), "비행 포기 (둥지로)", new Color(0.55f, 0.8f, 1f), textColor, out _);
             var hint = MakeText(box.transform, "Hint", new Vector2(0.5f, 0), new Vector2(0, 45), new Vector2(680, 50), 26, TextAnchor.MiddleCenter);
             hint.text = "Esc / P / 패드 Start 로 열고 닫기";
             hint.color = new Color(1, 1, 1, 0.6f);

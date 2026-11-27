@@ -12,6 +12,26 @@ namespace DragonRecipe.Tests
     /// <summary>실제 씬을 띄워 이륙 → (입력 없이) 착지/추락 → 결과까지 한 바퀴 도는지 확인.</summary>
     public class FlightPrototypeSmokeTests
     {
+        string _savePath;
+
+        [SetUp]
+        public void SetUp()
+        {
+            // 실제 저장 파일을 건드리지 않게 임시 경로 사용
+            _savePath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"dragon_play_{System.Guid.NewGuid():N}.json");
+            DragonRecipe.Care.SaveSystem.PathOverride = _savePath;
+            DragonRecipe.Care.DragonCare.UnloadForTests();
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            DragonRecipe.Care.DragonCare.UnloadForTests();
+            DragonRecipe.Care.SaveSystem.PathOverride = null;
+            if (System.IO.File.Exists(_savePath)) System.IO.File.Delete(_savePath);
+            GamePause.Set(false);
+        }
+
         [UnityTest]
         public IEnumerator Scene_FullFlightLoop_EndsWithResult()
         {

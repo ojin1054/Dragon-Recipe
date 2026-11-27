@@ -55,9 +55,10 @@ namespace DragonRecipe.CameraRig
             Transform tr = target.transform;
             float yaw = target.Model != null ? target.Model.Yaw : tr.eulerAngles.y;
             Vector3 flatForward = Quaternion.Euler(0, yaw, 0) * Vector3.forward;
-            float dist = distance + extraDistanceAtMaxSpeed * speedT;
+            float scale = Mathf.Max(0.1f, tr.localScale.x); // 성장해서 커지면 카메라도 물러남
+            float dist = (distance + extraDistanceAtMaxSpeed * speedT) * scale;
 
-            pos = tr.position - flatForward * dist + Vector3.up * height;
+            pos = tr.position - flatForward * dist + Vector3.up * (height * scale);
             // 카메라가 땅속으로 들어가지 않게
             if (Physics.Raycast(pos + Vector3.up * 50f, Vector3.down, out var hit, 100f, ~0, QueryTriggerInteraction.Ignore)
                 && hit.point.y < tr.position.y)

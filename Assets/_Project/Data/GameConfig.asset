@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 389579c6f9d90b348a3001fc46a44831, type: 3}
+  m_Name: GameConfig
+  m_EditorClassIdentifier: DragonRecipe.Runtime::DragonRecipe.Care.GameConfig
+  care:
+    maxHunger: 100
+    startingHunger: 50
+    hungerDecayPerHour: 20
+    offlineCapHours: 8
+    hungryThreshold: 0.3
+    xpToJuvenile: 150
+    xpToAdult: 450
+    starvationRecovery: 20
+    starvingStaminaMultiplier: 0.6
+    starvingFlapLiftMultiplier: 0.8
+  stages:
+  - {fileID: 11400000, guid: b82cde2ebdf582c4aa3f7caa08edd85a, type: 2}
+  - {fileID: 11400000, guid: bee4fab7a57ee03468a7c1a053e6a360, type: 2}
+  - {fileID: 11400000, guid: 1db9f8c753062ab4da02c2d8f8f4570c, type: 2}
+  nestScene: Nest
+  flightScene: FlightPrototype
