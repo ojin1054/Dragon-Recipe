@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0aab56ee24598744da4a962e0513aa3c, type: 3}
   m_Name: Food_boar
   m_EditorClassIdentifier: DragonRecipe.Runtime::DragonRecipe.Food.FoodData
+  schema: 1
   id: boar
   displayName: "\uBA67\uB3FC\uC9C0"
   satiety: 20
@@ -23,4 +24,9 @@ MonoBehaviour:
   flees: 1
   fleeSpeed: 7
   fleeRadius: 25
+  herdMin: 1
+  herdMax: 1
+  scatterSpeed: 5
+  carryWeight: 1.6
+  struggles: 1
   spawnWeight: 2

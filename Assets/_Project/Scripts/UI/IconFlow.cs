@@ -91,13 +91,15 @@ namespace DragonRecipe.UI
             }
 
             /// <param name="scale">기본 아이콘 크기 배율</param>
-            public Row Icon(Sprite sprite, float scale = 1f)
+            /// <param name="tint">아이콘 색 (검정 = 아직 모르는 것의 실루엣)</param>
+            public Row Icon(Sprite sprite, float scale = 1f, Color? tint = null)
             {
                 if (!sprite) return this;
                 var go = new GameObject(sprite.name, typeof(RectTransform));
                 go.transform.SetParent(_root, false);
                 var img = go.AddComponent<Image>();
                 img.sprite = sprite;
+                img.color = tint ?? Color.white;
                 img.preserveAspect = true;
                 img.raycastTarget = false;
                 var le = go.AddComponent<LayoutElement>();

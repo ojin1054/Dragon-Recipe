@@ -78,7 +78,7 @@ namespace DragonRecipe.Tests
             var food = ScriptableObject.CreateInstance<FoodData>();
             food.trait = FoodTrait.Fish;
             var result = new FlightResult { reason = FlightEndReason.Crashed };
-            result.caught.Add(new CaughtFood { food = food, satiety = 15f });
+            result.caught.Add(new CaughtFood { food = food, satiety = 15f, eaten = true }); // 날면서 먹음
 
             GameEvents.RaiseFlightEnded(result);
 
@@ -88,6 +88,64 @@ namespace DragonRecipe.Tests
             Assert.IsTrue(SaveSystem.TryLoad(out var saved));
             Assert.AreEqual(15f, saved.GetTrait(FoodTrait.Fish), 0.01f);
             UnityEngine.Object.Destroy(food);
+        }
+
+        [UnityTest]
+        public IEnumerator CarriedFood_GoesToStorage_CrashDropsSome()
+        {
+            yield return SceneManager.LoadSceneAsync("FlightPrototype");
+            yield return null;
+
+            var food = DragonCare.Config.foods[0];
+            float before = DragonCare.State.hunger;
+
+            // 착지: 들고 온 2개는 창고로
+            var landed = new FlightResult { reason = FlightEndReason.Landed };
+            landed.caught.Add(new CaughtFood { food = food, satiety = 10f });
+            landed.caught.Add(new CaughtFood { food = food, satiety = 10f, rare = true });
+            GameEvents.RaiseFlightEnded(landed);
+            Assert.AreEqual(before, DragonCare.State.hunger, 0.5f, "들고 온 먹이는 바로 먹지 않음");
+            Assert.AreEqual(2, DragonCare.State.storage.Count);
+            Assert.AreEqual(2, DragonCare.LastFlightReport.stored.Count);
+            Assert.AreEqual(2, DragonCare.State.Codex(food.id).caught);
+            Assert.AreEqual(1, DragonCare.State.Codex(food.id).rareCaught);
+
+            // 추락: 떨어뜨린 건 잃고 나머지만 창고로
+            var crashed = new FlightResult { reason = FlightEndReason.Crashed };
+            crashed.caught.Add(new CaughtFood { food = food, satiety = 10f });
+            crashed.caught.Add(new CaughtFood { food = food, satiety = 10f, dropped = true });
+            GameEvents.RaiseFlightEnded(crashed);
+            Assert.AreEqual(3, DragonCare.State.storage.Count);
+            Assert.AreEqual(1, DragonCare.LastFlightReport.dropped.Count);
+            Assert.IsTrue(DragonCare.State.injured);
+        }
+
+        [UnityTest]
+        public IEnumerator Nest_StorageButtons_FeedDragon()
+        {
+            var s = new DragonState { hunger = 40f, lastTickUtc = DateTime.UtcNow.Ticks };
+            s.storage.Add(new StoredFood { id = "sheep", satiety = 12f, trait = FoodTrait.Meat });
+            s.storage.Add(new StoredFood { id = "sheep", satiety = 12f, trait = FoodTrait.Meat });
+            SaveSystem.Save(s);
+
+            yield return SceneManager.LoadSceneAsync("Nest");
+            yield return null;
+            yield return null;
+
+            var panel = UnityEngine.Object.FindFirstObjectByType<DragonRecipe.UI.StoragePanel>();
+            Assert.IsNotNull(panel, "창고 패널 없음");
+            var buttons = panel.grid.GetComponentsInChildren<UnityEngine.UI.Button>();
+            Assert.AreEqual(1, buttons.Length, "같은 먹이는 버튼 하나로 묶여야 함");
+            buttons[0].onClick.Invoke();
+            Assert.AreEqual(52f, DragonCare.State.hunger, 0.5f);
+            Assert.AreEqual(1, DragonCare.State.storage.Count);
+            Assert.Greater(DragonCare.State.GetTrait(FoodTrait.Meat), 0f);
+
+            var codex = UnityEngine.Object.FindFirstObjectByType<DragonRecipe.UI.CodexPanel>();
+            Assert.IsNotNull(codex, "도감 없음");
+            codex.Open();
+            Assert.IsTrue(codex.IsOpen);
+            Assert.Greater(codex.foodFlow.transform.childCount, 0, "도감 먹이 줄이 없음");
         }
     }
 }

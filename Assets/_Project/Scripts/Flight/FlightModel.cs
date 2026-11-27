@@ -37,6 +37,14 @@ namespace DragonRecipe.Flight
         public float Health;
         public float Time { get; private set; }
         public int PerfectFlapCount { get; private set; }
+        /// <summary>발톱에 매단 먹이 무게 합</summary>
+        public float Payload;
+
+        /// <summary>매단 무게 / 드는 힘 (0 = 빈 발톱)</summary>
+        public float LoadFactor => Mathf.Max(0f, Payload) / Mathf.Max(0.01f, Params.carryStrength);
+        public float LiftLoadMultiplier => 1f - Mathf.Min(0.8f, LoadFactor * Params.payloadLiftPenalty);
+        public float FlapLoadMultiplier => 1f - Mathf.Min(0.7f, LoadFactor * Params.payloadFlapPenalty);
+        public float TurnLoadMultiplier => 1f - Mathf.Min(0.6f, LoadFactor * Params.payloadTurnPenalty);
 
         float _lastFlapTime = float.NegativeInfinity;
 
@@ -68,7 +76,28 @@ namespace DragonRecipe.Flight
             Health = Params.maxHealth;
             Time = 0f;
             PerfectFlapCount = 0;
+            Payload = 0f;
             _lastFlapTime = float.NegativeInfinity;
+        }
+
+        /// <summary>매달린 먹이가 버둥거려 몸이 흔들린다</summary>
+        public void Jolt(float bankDelta, float pitchDelta, float staminaCost)
+        {
+            Bank = Mathf.Clamp(Bank + bankDelta, -Params.maxBank, Params.maxBank);
+            Pitch = Mathf.Clamp(Pitch + pitchDelta, -Params.maxPitchDown, Params.maxPitchUp);
+            Stamina = Mathf.Max(0f, Stamina - staminaCost);
+        }
+
+        /// <summary>공중에서 먹이를 먹어 스태미나를 회복한다</summary>
+        public void Eat(float staminaGain)
+        {
+            Stamina = Mathf.Min(Params.maxStamina, Stamina + Mathf.Max(0f, staminaGain));
+        }
+
+        /// <summary>땅 밖에서 입은 피해 (걷어차임 등)</summary>
+        public void TakeDamage(float damage)
+        {
+            Health = Mathf.Max(0f, Health - Mathf.Max(0f, damage));
         }
 
         /// <summary>
@@ -130,7 +159,7 @@ namespace DragonRecipe.Flight
             Stamina -= Params.flapStaminaCost;
             _lastFlapTime = Time;
 
-            VerticalSpeed = Mathf.Min(VerticalSpeed + Params.flapLift * eff, Params.maxRiseSpeed);
+            VerticalSpeed = Mathf.Min(VerticalSpeed + Params.flapLift * eff * FlapLoadMultiplier, Params.maxRiseSpeed);
             Speed = Mathf.Min(Speed + Params.flapThrust * eff, Params.maxSpeed);
             if (outcome == FlapOutcome.Perfect) PerfectFlapCount++;
             return outcome;
@@ -179,9 +208,11 @@ namespace DragonRecipe.Flight
 
             // 선회: 스틱 좌우는 몸을 "기울이는" 입력. 손을 떼면 기울기를 유지하고,
             // 기울어진 만큼 계속 선회한다 (수평으로 돌리려면 반대로 밀어야 함)
-            Bank += stick.x * p.bankResponse * dt;
+            // 무거운 먹이를 매달면 몸이 둔해진다
+            float turnLoad = TurnLoadMultiplier;
+            Bank += stick.x * p.bankResponse * turnLoad * dt;
             Bank = Mathf.Clamp(Bank, -p.maxBank, p.maxBank);
-            Yaw += (Bank / Mathf.Max(1f, p.maxBank)) * p.turnRate * dt;
+            Yaw += (Bank / Mathf.Max(1f, p.maxBank)) * p.turnRate * turnLoad * dt;
 
             // 속도: 내려가면 가속, 올라가면 감속
             float sinPitch = Mathf.Sin(Pitch * Mathf.Deg2Rad);
@@ -189,7 +220,7 @@ namespace DragonRecipe.Flight
             Speed = Mathf.Clamp(Speed, p.minSpeed, p.maxSpeed);
 
             // 수직: 양력이 모자란 만큼 가라앉는다
-            float lift = LiftFraction(Speed);
+            float lift = LiftFraction(Speed) * LiftLoadMultiplier;
             VerticalSpeed += -p.gravity * (1f - lift) * dt;
             VerticalSpeed -= VerticalSpeed * p.verticalDamping * dt;
             VerticalSpeed = Mathf.Clamp(VerticalSpeed, -p.maxSinkSpeed, p.maxRiseSpeed);

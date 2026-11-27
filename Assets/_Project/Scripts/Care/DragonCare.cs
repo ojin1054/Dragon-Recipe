@@ -1,40 +1,38 @@
 using System;
-using System.Text;
+using System.Collections.Generic;
 using DragonRecipe.Core;
 using DragonRecipe.Flight;
+using DragonRecipe.Food;
 using UnityEngine;
 
 namespace DragonRecipe.Care
 {
-    /// <summary>비행 한 번이 드래곤에게 남긴 결과 (둥지 화면에 표시)</summary>
+    /// <summary>비행 한 번이 드래곤에게 남긴 결과 (둥지 / 결과 화면에 아이콘으로 표시)</summary>
     public class FlightCareReport
     {
         public int foodCount;
-        /// <summary>잡아 온 먹이 (아이콘 표시용)</summary>
-        public System.Collections.Generic.List<DragonRecipe.Food.FoodData> foods = new System.Collections.Generic.List<DragonRecipe.Food.FoodData>();
+        /// <summary>잡은 먹이 전부</summary>
+        public List<FoodData> foods = new List<FoodData>();
+        /// <summary>비행 중에 먹은 먹이</summary>
+        public List<FoodData> eaten = new List<FoodData>();
+        /// <summary>둥지까지 들고 와 창고에 넣은 먹이</summary>
+        public List<FoodData> stored = new List<FoodData>();
+        /// <summary>추락하며 떨어뜨린 먹이</summary>
+        public List<FoodData> dropped = new List<FoodData>();
+        /// <summary>창고가 가득 차 버린 먹이</summary>
+        public List<FoodData> overflow = new List<FoodData>();
+        /// <summary>처음으로 잡아 도감에 새로 오른 먹이</summary>
+        public List<FoodData> newInCodex = new List<FoodData>();
+        public int rareCount;
+
+        // 비행 중에 먹은 먹이가 남긴 것
         public float absorbed;
         public float wasted;
         public float xpGained;
         public bool injured;
         public bool grew;
         public GrowthStage newStage;
-
-        public string Describe()
-        {
-            var sb = new StringBuilder();
-            if (foodCount == 0)
-            {
-                sb.Append("먹이를 못 잡았어요");
-            }
-            else
-            {
-                sb.Append($"먹이 {foodCount}개 → 포만도 +{absorbed:0}, 성장 +{xpGained:0}");
-                if (wasted > 0.5f) sb.Append($"\n배가 불러 {wasted:0}만큼은 버렸어요 (먹이 창고는 다음 단계)");
-            }
-            if (grew) sb.Append($"\n<color=#ffd84d>{CareLogic.StageName(newStage)}(으)로 성장했어요!</color>");
-            if (injured) sb.Append("\n<color=#ff8877>추락해서 다쳤어요</color>");
-            return sb.ToString();
-        }
+        public DragonForm newForm;
     }
 
     /// <summary>
@@ -51,6 +49,10 @@ namespace DragonRecipe.Care
         public static Func<DateTime> Clock = () => DateTime.UtcNow;
 
         public static event Action<GrowthStage> StageChanged;
+        /// <summary>둥지에서 창고 먹이를 먹임</summary>
+        public static event Action<FeedOutcome> Fed;
+        /// <summary>새 알을 부화시킴</summary>
+        public static event Action Hatched;
 
         public static void EnsureLoaded(GameConfig config)
         {
@@ -59,9 +61,25 @@ namespace DragonRecipe.Care
 
             if (!SaveSystem.TryLoad(out var s) || s.version <= 0)
                 s = DragonState.CreateNew(Config.care, Clock());
+            Migrate(s);
             State = s;
             Tick();
             Save();
+        }
+
+        /// <summary>예전 저장 파일에 없던 값 채우기</summary>
+        static void Migrate(DragonState s)
+        {
+            s.storage ??= new List<StoredFood>();
+            s.codexFoods ??= new List<CodexFood>();
+            s.codexForms ??= new List<DragonForm>();
+            if (s.generation <= 0) s.generation = 1;
+            if (s.stage == GrowthStage.Adult && s.form == DragonForm.None)
+            {
+                s.form = CareLogic.FormFor(s, Config.care);
+                if (!s.codexForms.Contains(s.form)) s.codexForms.Add(s.form);
+            }
+            s.version = DragonState.CurrentVersion;
         }
 
         /// <summary>흐른 시간만큼 허기 반영 (매 프레임 불러도 됨)</summary>
@@ -78,6 +96,8 @@ namespace DragonRecipe.Care
 
         public static DragonStageData CurrentStageData => IsLoaded ? Config.StageData(State.stage) : null;
 
+        public static FoodData FindFood(string id) => Config ? Config.FindFood(id) : null;
+
         /// <summary>현재 단계 + 굶주림을 반영한 비행 수치</summary>
         public static FlightParams CurrentFlightParams()
         {
@@ -87,7 +107,10 @@ namespace DragonRecipe.Care
             return CareLogic.FlightParamsFor(data.flight, State, Config.care);
         }
 
-        /// <summary>잡은 먹이를 먹이고 부상/성장을 기록한다.</summary>
+        /// <summary>
+        /// 비행 결과 반영: 비행 중에 먹은 먹이는 바로 배를 채우고, 들고 온 먹이는 창고로,
+        /// 떨어뜨린 먹이는 잃는다. 잡은 먹이는 모두 도감에 기록된다.
+        /// </summary>
         public static FlightCareReport ApplyFlightResult(FlightResult result)
         {
             if (!IsLoaded || result == null) return null;
@@ -98,14 +121,35 @@ namespace DragonRecipe.Care
             {
                 if (c.food == null) continue;
                 report.foods.Add(c.food);
-                var o = CareLogic.Feed(State, Config.care, c.satiety, c.food.trait);
-                report.absorbed += o.absorbed;
-                report.wasted += o.wasted;
-                report.xpGained += o.xpGained;
-                if (o.stageChanged)
+                if (c.rare) report.rareCount++;
+                if (State.Codex(c.food.id) == null && !report.newInCodex.Contains(c.food)) report.newInCodex.Add(c.food);
+                CareLogic.RecordCatch(State, c.food.id, c.rare);
+
+                if (c.eaten)
                 {
-                    report.grew = true;
-                    report.newStage = o.newStage;
+                    report.eaten.Add(c.food);
+                    var o = CareLogic.Feed(State, Config.care, c.satiety, c.food.trait);
+                    report.absorbed += o.absorbed;
+                    report.wasted += o.wasted;
+                    report.xpGained += o.xpGained;
+                    if (o.stageChanged)
+                    {
+                        report.grew = true;
+                        report.newStage = o.newStage;
+                        if (o.newForm != DragonForm.None) report.newForm = o.newForm;
+                    }
+                }
+                else if (c.dropped)
+                {
+                    report.dropped.Add(c.food);
+                }
+                else if (CareLogic.Store(State, Config.care, c.food.id, c.satiety, c.food.trait, c.rare))
+                {
+                    report.stored.Add(c.food);
+                }
+                else
+                {
+                    report.overflow.Add(c.food);
                 }
             }
 
@@ -116,6 +160,30 @@ namespace DragonRecipe.Care
 
             if (report.grew) StageChanged?.Invoke(report.newStage);
             return report;
+        }
+
+        /// <summary>둥지에서 창고 먹이 하나를 먹인다. 배가 꽉 찼으면 false</summary>
+        public static bool FeedFromStorage(int index)
+        {
+            if (!IsLoaded) return false;
+            Tick();
+            if (!CareLogic.FeedFromStorage(State, Config.care, index, out var o)) return false;
+            Save();
+            Fed?.Invoke(o);
+            if (o.stageChanged) StageChanged?.Invoke(o.newStage);
+            return true;
+        }
+
+        /// <summary>성체가 된 뒤 새 알을 부화시킨다 (도감은 이어짐)</summary>
+        public static bool HatchNewEgg()
+        {
+            if (!IsLoaded || State.stage != GrowthStage.Adult) return false;
+            State = CareLogic.HatchNewEgg(State, Config.care, Clock());
+            LastFlightReport = null;
+            Save();
+            Hatched?.Invoke();
+            StageChanged?.Invoke(State.stage);
+            return true;
         }
 
         /// <summary>저장을 지우고 새 드래곤으로 시작</summary>
@@ -145,6 +213,8 @@ namespace DragonRecipe.Care
             Config = null;
             LastFlightReport = null;
             StageChanged = null;
+            Fed = null;
+            Hatched = null;
             Clock = () => DateTime.UtcNow;
         }
 

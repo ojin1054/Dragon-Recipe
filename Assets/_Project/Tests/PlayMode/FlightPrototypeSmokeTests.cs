@@ -98,6 +98,43 @@ namespace DragonRecipe.Tests
         }
 
         [UnityTest]
+        public IEnumerator Snatching_CarriesFood_ComboAndEatInAir()
+        {
+            yield return SceneManager.LoadSceneAsync("FlightPrototype");
+            yield return null;
+
+            var session = Object.FindFirstObjectByType<FlightSession>();
+            var spawner = Object.FindFirstObjectByType<PreySpawner>();
+            typeof(FlightSession).GetMethod("Launch", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                .Invoke(session, null);
+            yield return null;
+
+            var snatch = typeof(FlightSession).GetMethod("OnSnatched", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var light = spawner.All.Where(p => p.IsAvailable && !p.Data.struggles).Take(2).ToArray();
+            Assert.AreEqual(2, light.Length);
+            snatch.Invoke(session, new object[] { light[0] });
+            snatch.Invoke(session, new object[] { light[1] });
+
+            Assert.AreEqual(2, session.Result.CarriedCount);
+            Assert.AreEqual(2, session.CurrentCombo, "연달아 잡으면 연속 사냥");
+            Assert.AreEqual(2, session.Result.caught[1].combo);
+            Assert.AreEqual(2, session.Result.maxCombo);
+            Assert.Greater(session.dragon.Model.Payload, 0f, "매단 먹이 무게가 비행에 반영돼야 함");
+            var carry = Object.FindFirstObjectByType<CarryVisual>();
+            Assert.IsNotNull(carry);
+            Assert.AreEqual(2, session.snatchZone.transform.Find("CarriedFood").childCount, "매달린 먹이가 안 보임");
+
+            float stamina = session.dragon.Model.Stamina;
+            float payload = session.dragon.Model.Payload;
+            Assert.IsTrue(session.EatInAir());
+            Assert.IsTrue(session.dragon.IsEating);
+            Assert.AreEqual(1, session.Result.CarriedCount);
+            Assert.Less(session.dragon.Model.Payload, payload);
+            Assert.GreaterOrEqual(session.dragon.Model.Stamina, stamina);
+            Assert.IsFalse(session.EatInAir(), "먹는 중에는 또 먹지 않음");
+        }
+
+        [UnityTest]
         public IEnumerator Pause_FreezesFlight_AndShowsMenu()
         {
             yield return SceneManager.LoadSceneAsync("FlightPrototype");

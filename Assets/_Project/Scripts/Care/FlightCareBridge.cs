@@ -46,7 +46,10 @@ namespace DragonRecipe.Care
         {
             if (!dragon || !DragonCare.IsLoaded) return;
             var data = DragonCare.CurrentStageData;
-            if (data) dragon.SetStage(data, DragonCare.CurrentFlightParams());
+            if (!data) return;
+            dragon.SetStage(data, DragonCare.CurrentFlightParams());
+            // 자랄수록 동물이 드래곤을 늦게 알아챈다
+            if (session && session.spawner) session.spawner.awarenessScale = data.preyAwarenessScale;
         }
 
         void OnFlightEnded(FlightResult result) => DragonCare.ApplyFlightResult(result);

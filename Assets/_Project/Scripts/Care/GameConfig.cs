@@ -10,6 +10,8 @@ namespace DragonRecipe.Care
         public CareSettings care = new CareSettings();
         [Tooltip("GrowthStage 순서대로 (어린, 청소년, 성체)")]
         public DragonStageData[] stages;
+        [Tooltip("모든 먹이 (먹이 창고 / 도감에서 id로 찾는다)")]
+        public DragonRecipe.Food.FoodData[] foods;
         public string nestScene = "Nest";
         public string flightScene = "FlightPrototype";
 
@@ -18,6 +20,14 @@ namespace DragonRecipe.Care
             int i = (int)stage;
             if (stages == null || stages.Length == 0) return null;
             return stages[Mathf.Clamp(i, 0, stages.Length - 1)];
+        }
+
+        public DragonRecipe.Food.FoodData FindFood(string id)
+        {
+            if (foods == null) return null;
+            foreach (var f in foods)
+                if (f && f.id == id) return f;
+            return null;
         }
     }
 }

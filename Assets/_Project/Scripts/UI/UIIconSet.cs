@@ -37,5 +37,25 @@ namespace DragonRecipe.UI
         [Header("화살표")]
         public Sprite arrowRight;
         public Sprite arrowDown;
+
+        [Header("사냥 / 창고 / 도감")]
+        public Sprite claw;
+        public Sprite basket;
+        public Sprite book;
+        public Sprite egg;
+        public Sprite dragon;
+
+        [Header("먹이 성질")]
+        public Sprite flame;
+        public Sprite leaf;
+        public Sprite fish;
+
+        public Sprite Trait(DragonRecipe.Food.FoodTrait t) => t switch
+        {
+            DragonRecipe.Food.FoodTrait.Meat => meat,
+            DragonRecipe.Food.FoodTrait.Fish => fish,
+            DragonRecipe.Food.FoodTrait.Fire => flame,
+            _ => leaf
+        };
     }
 }

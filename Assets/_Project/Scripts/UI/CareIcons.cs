@@ -45,8 +45,8 @@ namespace DragonRecipe.UI
                     flow.AddRow().Icon(set.faceHungry, 1.6f).Gap().Icon(set.arrowRight).Icon(set.wing).Icon(set.meat);
                     break;
                 case Mood.Full:
-                    // 배불러요 → 지금 잡은 먹이는 버려져요
-                    flow.AddRow().Icon(set.faceFull, 1.6f).Gap().Icon(set.meat).Icon(set.arrowRight).Icon(set.trash);
+                    // 배불러요 → 잡은 먹이는 창고로
+                    flow.AddRow().Icon(set.faceFull, 1.6f).Gap().Icon(set.meat).Icon(set.arrowRight).Icon(set.basket);
                     break;
                 default:
                     flow.AddRow().Icon(set.faceHappy, 1.6f);
@@ -58,7 +58,9 @@ namespace DragonRecipe.UI
                 flow.AddRow().Icon(set.bandage, 1.2f).Icon(set.arrowRight).Icon(set.potion, 1.2f);
         }
 
-        /// <summary>지난 비행이 드래곤에게 남긴 것 (먹이 / 포만도 / 성장 / 버림 / 부상)</summary>
+        static readonly Color Faded = new Color(1f, 1f, 1f, 0.45f);
+
+        /// <summary>지난 비행이 드래곤에게 남긴 것 (먹이 / 공중에서 먹음 / 창고 / 떨어뜨림 / 도감 / 성장 / 부상)</summary>
         /// <param name="simple">true면 포만도만 표시 (성장 경험치·버린 양 생략, 비행 결과 화면용)</param>
         public static void Report(IconFlow flow, UIIconSet set, FlightCareReport r, bool includeFoods = true, bool simple = false)
         {
@@ -71,20 +73,42 @@ namespace DragonRecipe.UI
             else
             {
                 if (includeFoods) Foods(flow.AddRow(), set, r.foods);
-                var gain = flow.AddRow().Icon(set.meat).Text($"+{r.absorbed:0}");
-                if (!simple)
+
+                // 날면서 먹음 → 바로 배가 참
+                if (r.eaten.Count > 0)
                 {
-                    gain.Gap().Icon(set.sprout).Text($"+{r.xpGained:0}");
-                    if (r.wasted > 0.5f) gain.Gap().Icon(set.trash).Text($"{r.wasted:0}", Bad);
+                    var gain = flow.AddRow().Icon(set.wing).Icon(set.meat).Text($"+{r.absorbed:0}");
+                    if (!simple)
+                    {
+                        gain.Gap().Icon(set.sprout).Text($"+{r.xpGained:0}");
+                        if (r.wasted > 0.5f) gain.Gap().Icon(set.trash).Text($"{r.wasted:0}", Bad);
+                    }
+                }
+                // 둥지까지 들고 옴 → 창고
+                if (r.stored.Count > 0) Foods(flow.AddRow().Icon(set.basket).Text($"+{r.stored.Count}").Gap(16f), set, r.stored);
+                // 창고가 가득 차 버림
+                if (r.overflow.Count > 0) flow.AddRow().Icon(set.basket).Icon(set.no).Icon(set.trash).Text($"{r.overflow.Count}", Bad);
+                // 추락하며 떨어뜨림
+                if (r.dropped.Count > 0) Foods(flow.AddRow().Icon(set.boom).Icon(set.arrowDown).Gap(16f), set, r.dropped, tint: Faded);
+                // 도감에 새로 오름 / 희귀 개체
+                if (r.newInCodex.Count > 0 || r.rareCount > 0)
+                {
+                    var row = flow.AddRow();
+                    if (r.newInCodex.Count > 0) Foods(row.Icon(set.book).Text("+").Gap(8f), set, r.newInCodex);
+                    if (r.rareCount > 0) row.Gap().Icon(set.sparkle).Text($"x{r.rareCount}", Good);
                 }
             }
 
-            if (r.grew) flow.AddRow().Icon(set.star).Icon(set.sprout, 1.3f).Icon(set.star); // 성장했어요
+            if (r.grew)
+            {
+                var row = flow.AddRow().Icon(set.star).Icon(set.sprout, 1.3f).Icon(set.star); // 성장했어요
+                if (r.newForm != DragonForm.None) row.Gap().Icon(set.dragon, 1.4f, DragonLook.FormColor(r.newForm)); // 성체 모습
+            }
             if (r.injured) flow.AddRow().Icon(set.boom).Icon(set.arrowRight).Icon(set.bandage); // 추락해서 다쳤어요
         }
 
         /// <summary>먹이 종류별 얼굴 아이콘을 잡은 수만큼 (maxIcons를 넘으면 아이콘 하나 + xN)</summary>
-        public static IconFlow.Row Foods(IconFlow.Row row, UIIconSet set, IEnumerable<FoodData> foods, int maxIcons = 3)
+        public static IconFlow.Row Foods(IconFlow.Row row, UIIconSet set, IEnumerable<FoodData> foods, int maxIcons = 3, Color? tint = null)
         {
             var counts = new Dictionary<FoodData, int>();
             var order = new List<FoodData>();
@@ -95,7 +119,15 @@ namespace DragonRecipe.UI
                 counts[f] = counts.TryGetValue(f, out int n) ? n + 1 : 1;
             }
             foreach (var f in order)
-                row.Repeat(f.icon ? f.icon : set.meat, counts[f], maxIcons).Gap(12f);
+            {
+                var icon = f.icon ? f.icon : set.meat;
+                int n = counts[f];
+                if (n <= maxIcons)
+                    for (int i = 0; i < n; i++) row.Icon(icon, 1f, tint);
+                else
+                    row.Icon(icon, 1f, tint).Text($"x{n}");
+                row.Gap(12f);
+            }
             return row;
         }
 
@@ -114,7 +146,8 @@ namespace DragonRecipe.UI
         {
             flow.Clear();
             flow.AddRow().Icon(set.clock).Text($"{r.airtime:0.0}s").Gap(40f).Icon(set.wind).Text($"{r.maxSpeed * 3.6f:0} km/h");
-            flow.AddRow().Icon(set.target).Text($"{r.nearMissCount}");
+            var skill = flow.AddRow().Icon(set.target).Text($"{r.nearMissCount}");
+            if (r.maxCombo >= 2) skill.Gap(40f).Icon(set.claw).Text($"x{r.maxCombo}", Good); // 연속 사냥
 
             // 잡은 먹이: 종류별 얼굴을 잡은 수만큼 (한 줄에 다 들어가게 종류당 최대 8개)
             var foods = new List<FoodData>();

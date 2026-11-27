@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace DragonRecipe.Food
 {
-    /// <summary>먹이 성질. 나중에 어떤 성질을 많이 먹었는지로 성체 외형이 갈린다.</summary>
+    /// <summary>먹이 성질. 어떤 성질을 많이 먹었는지로 성체 외형이 갈린다.</summary>
     public enum FoodTrait
     {
         Meat,
@@ -14,6 +14,9 @@ namespace DragonRecipe.Food
     [CreateAssetMenu(menuName = "Dragon Recipe/Food", fileName = "Food_")]
     public class FoodData : ScriptableObject
     {
+        /// <summary>씬 빌더가 새 필드 기본값을 채웠는지 (기존 에셋 이전용)</summary>
+        [HideInInspector] public int schema;
+
         public string id = "food";
         public string displayName = "먹이";
         [Tooltip("허기를 채우는 양")]
@@ -32,7 +35,21 @@ namespace DragonRecipe.Food
         [Tooltip("드래곤이 가까이 오면 도망가는지")]
         public bool flees;
         public float fleeSpeed = 5f;
+        [Tooltip("드래곤을 알아채는 거리. 드래곤이 자랄수록 성장 단계의 배율만큼 좁아진다")]
         public float fleeRadius = 25f;
+
+        [Header("무리")]
+        [Tooltip("한 무리의 최소 / 최대 마릿수 (1 = 혼자 다님)")]
+        public int herdMin = 1;
+        public int herdMax = 1;
+        [Tooltip("무리 중 하나가 잡히면 나머지가 흩어지는 속도")]
+        public float scatterSpeed = 5f;
+
+        [Header("사냥")]
+        [Tooltip("발톱에 매달았을 때 무게. 무거울수록 비행이 둔해진다")]
+        public float carryWeight = 1f;
+        [Tooltip("매달린 채 버둥거려 드래곤을 흔든다. 제대로(아슬아슬하게) 못 잡으면 걷어차인다")]
+        public bool struggles;
 
         [Header("스폰")]
         [Tooltip("스폰 가중치 (클수록 자주 등장)")]

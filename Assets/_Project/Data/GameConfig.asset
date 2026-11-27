@@ -23,9 +23,17 @@ MonoBehaviour:
     starvationRecovery: 20
     starvingStaminaMultiplier: 0.6
     starvingFlapLiftMultiplier: 0.8
+    storageCapacity: 12
+    formDominance: 0.4
   stages:
   - {fileID: 11400000, guid: b82cde2ebdf582c4aa3f7caa08edd85a, type: 2}
   - {fileID: 11400000, guid: bee4fab7a57ee03468a7c1a053e6a360, type: 2}
   - {fileID: 11400000, guid: 1db9f8c753062ab4da02c2d8f8f4570c, type: 2}
+  foods:
+  - {fileID: 11400000, guid: 7ec2fbbd45819ac489c4ba288fae0f6a, type: 2}
+  - {fileID: 11400000, guid: 0b7f6a0ff57438b4c9ed3278fb4ba286, type: 2}
+  - {fileID: 11400000, guid: d37f181f412578f42b8278090916aeea, type: 2}
+  - {fileID: 11400000, guid: 8d7bf1f365c3ca549a23719ac9bbde04, type: 2}
+  - {fileID: 11400000, guid: aed3bcbdeed991949ba039f86435a50e, type: 2}
   nestScene: Nest
   flightScene: FlightPrototype
