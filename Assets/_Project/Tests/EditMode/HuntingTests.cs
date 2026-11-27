@@ -94,12 +94,34 @@ namespace DragonRecipe.Tests
         // ───────────── 사냥 규칙 ─────────────
 
         [Test]
-        public void Combo_GrowsAndCaps()
+        public void Combo_StaminaAndBoost_GrowAndCap()
         {
-            var h = new HuntSettings { comboStep = 0.25f, comboMaxMultiplier = 2f };
-            Assert.AreEqual(1f, HuntRules.ComboMultiplier(1, h), 0.001f);
-            Assert.AreEqual(1.5f, HuntRules.ComboMultiplier(3, h), 0.001f);
-            Assert.AreEqual(2f, HuntRules.ComboMultiplier(10, h), 0.001f);
+            var h = new HuntSettings { comboStaminaPerStep = 15f, comboStaminaMax = 60f, comboBoostPerStep = 4f };
+            Assert.AreEqual(0f, HuntRules.ComboStamina(1, h), 0.001f, "단독 사냥은 보상 없음");
+            Assert.AreEqual(0f, HuntRules.ComboBoost(1, h), 0.001f);
+            Assert.AreEqual(30f, HuntRules.ComboStamina(3, h), 0.001f);
+            Assert.AreEqual(8f, HuntRules.ComboBoost(3, h), 0.001f);
+            Assert.AreEqual(60f, HuntRules.ComboStamina(10, h), 0.001f);
+            Assert.AreEqual(36f, HuntRules.ComboBoost(10, h), 0.001f, "추가 속도는 상한 없이 계속 커짐");
+        }
+
+        [Test]
+        public void Boost_ExceedsMaxSpeed_ThenFadesBack()
+        {
+            var m = Glider(0f);
+            m.Speed = m.Params.maxSpeed;
+            m.Boost(8f, 1f);
+            Assert.Greater(m.Speed, m.Params.maxSpeed + 7f, "바로 빨라짐");
+            Assert.IsTrue(m.IsBoosting);
+
+            for (int i = 0; i < 15; i++) m.Step(Dt, Vector2.zero); // 0.3초
+            Assert.Greater(m.Speed, m.Params.maxSpeed, "붙어 있는 동안은 최고 속도를 넘음");
+            m.TryFlap();
+            Assert.Greater(m.Speed, m.Params.maxSpeed, "날갯짓이 추가 속도를 깎지 않음");
+
+            for (int i = 0; i < 250; i++) m.Step(Dt, Vector2.zero); // 5초
+            Assert.IsFalse(m.IsBoosting);
+            Assert.LessOrEqual(m.Speed, m.Params.maxSpeed + 0.01f, "끝나면 최고 속도로 돌아옴");
         }
 
         [Test]

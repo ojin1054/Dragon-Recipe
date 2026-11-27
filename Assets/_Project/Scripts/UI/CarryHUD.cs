@@ -70,7 +70,7 @@ namespace DragonRecipe.UI
             comboIcons.Clear();
             var row = comboIcons.AddRow();
             for (int i = 0; i < Mathf.Min(combo, 5); i++) row.Icon(icons.claw, 1f + i * 0.08f);
-            row.Text($"x{combo}", ComboColor);
+            row.Text($"x{combo}", ComboColor).Gap(16f).Icon(icons.wind, 1.1f); // 속도가 붙음
             _comboTimer = comboShowTime;
         }
 

@@ -39,6 +39,10 @@ namespace DragonRecipe.Flight
         public int PerfectFlapCount { get; private set; }
         /// <summary>발톱에 매단 먹이 무게 합</summary>
         public float Payload;
+        /// <summary>잠깐 붙은 추가 속도 (연속 사냥 보상). 남은 시간 동안 최고 속도를 그만큼 넘을 수 있다</summary>
+        public float BoostSpeed { get; private set; }
+        public float BoostTimeLeft { get; private set; }
+        public bool IsBoosting => BoostTimeLeft > 0f;
 
         /// <summary>매단 무게 / 드는 힘 (0 = 빈 발톱)</summary>
         public float LoadFactor => Mathf.Max(0f, Payload) / Mathf.Max(0.01f, Params.carryStrength);
@@ -77,7 +81,18 @@ namespace DragonRecipe.Flight
             Time = 0f;
             PerfectFlapCount = 0;
             Payload = 0f;
+            BoostSpeed = 0f;
+            BoostTimeLeft = 0f;
             _lastFlapTime = float.NegativeInfinity;
+        }
+
+        /// <summary>잠깐 속도를 붙인다: 바로 extraSpeed만큼 빨라지고, duration 동안은 최고 속도 제한도 그만큼 풀린다</summary>
+        public void Boost(float extraSpeed, float duration)
+        {
+            if (extraSpeed <= 0f || duration <= 0f) return;
+            BoostSpeed = Mathf.Max(IsBoosting ? BoostSpeed : 0f, extraSpeed);
+            BoostTimeLeft = Mathf.Max(BoostTimeLeft, duration);
+            Speed = Mathf.Min(Speed + extraSpeed, Params.maxSpeed + BoostSpeed);
         }
 
         /// <summary>매달린 먹이가 버둥거려 몸이 흔들린다</summary>
@@ -160,7 +175,9 @@ namespace DragonRecipe.Flight
             _lastFlapTime = Time;
 
             VerticalSpeed = Mathf.Min(VerticalSpeed + Params.flapLift * eff * FlapLoadMultiplier, Params.maxRiseSpeed);
-            Speed = Mathf.Min(Speed + Params.flapThrust * eff, Params.maxSpeed);
+            // 추가 속도가 붙어 있으면 날갯짓이 그 속도를 깎지 않는다
+            float cap = Params.maxSpeed + (IsBoosting ? BoostSpeed : 0f);
+            Speed = Mathf.Max(Speed, Mathf.Min(Speed + Params.flapThrust * eff, cap));
             if (outcome == FlapOutcome.Perfect) PerfectFlapCount++;
             return outcome;
         }
@@ -217,7 +234,20 @@ namespace DragonRecipe.Flight
             // 속도: 내려가면 가속, 올라가면 감속
             float sinPitch = Mathf.Sin(Pitch * Mathf.Deg2Rad);
             Speed += (-p.gravity * sinPitch - p.drag * Speed * Speed) * dt;
-            Speed = Mathf.Clamp(Speed, p.minSpeed, p.maxSpeed);
+            // 추가 속도가 붙어 있는 동안은 최고 속도를 넘을 수 있다 (끝나면 공기 저항으로 서서히 줄어듦)
+            if (BoostTimeLeft > 0f)
+            {
+                BoostTimeLeft = Mathf.Max(0f, BoostTimeLeft - dt);
+                Speed = Mathf.Clamp(Speed, p.minSpeed, p.maxSpeed + BoostSpeed);
+            }
+            else if (Speed > p.maxSpeed)
+            {
+                Speed = Mathf.Max(p.maxSpeed, Speed - p.maxSpeed * 0.5f * dt);
+            }
+            else
+            {
+                Speed = Mathf.Max(Speed, p.minSpeed);
+            }
 
             // 수직: 양력이 모자란 만큼 가라앉는다
             float lift = LiftFraction(Speed) * LiftLoadMultiplier;

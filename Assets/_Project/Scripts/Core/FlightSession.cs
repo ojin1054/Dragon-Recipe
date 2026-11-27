@@ -187,13 +187,12 @@ namespace DragonRecipe.Core
             CurrentCombo = Time.time - LastCatchTime <= hunt.comboWindow ? CurrentCombo + 1 : 1;
             LastCatchTime = Time.time;
             Result.maxCombo = Mathf.Max(Result.maxCombo, CurrentCombo);
-            float comboMult = HuntRules.ComboMultiplier(CurrentCombo, hunt);
             bool rare = prey.IsRare;
 
             Result.caught.Add(new CaughtFood
             {
                 food = prey.Data,
-                satiety = prey.Data.satiety * mult * comboMult * (rare ? hunt.rareSatietyMultiplier : 1f),
+                satiety = prey.Data.satiety * mult * (rare ? hunt.rareSatietyMultiplier : 1f),
                 nearMiss = nearMiss,
                 rare = rare,
                 combo = CurrentCombo
@@ -201,6 +200,12 @@ namespace DragonRecipe.Core
             if (nearMiss) Result.nearMissCount++;
             spawner.OnCaught(prey);
             UpdatePayload();
+            // 연속 사냥 보상: 스태미나가 차오르고 잠깐 속도가 붙어 다음 먹이로 이어 가기 쉬워진다
+            if (CurrentCombo >= 2)
+            {
+                dragon.Model.Eat(HuntRules.ComboStamina(CurrentCombo, hunt));
+                dragon.Model.Boost(HuntRules.ComboBoost(CurrentCombo, hunt), hunt.comboBoostTime);
+            }
             Caught?.Invoke(CurrentCombo);
             CarryChanged?.Invoke();
 

@@ -80,9 +80,13 @@ namespace DragonRecipe.Core
         [UnityEngine.Header("연속 사냥")]
         [UnityEngine.Tooltip("이 시간(초) 안에 다음 먹이를 잡으면 연속 사냥")]
         public float comboWindow = 3f;
-        [UnityEngine.Tooltip("연속 사냥 한 번마다 늘어나는 포만도 배율")]
-        public float comboStep = 0.25f;
-        public float comboMaxMultiplier = 2f;
+        [UnityEngine.Tooltip("연속 사냥 한 단계마다 돌려받는 스태미나 (2연속 = 1단계)")]
+        public float comboStaminaPerStep = 15f;
+        public float comboStaminaMax = 60f;
+        [UnityEngine.Tooltip("연속 사냥 한 단계마다 잠깐 붙는 추가 속도 (m/s). 상한 없이 이어 갈수록 계속 커지고, 최고 속도도 그만큼 잠깐 넘을 수 있다")]
+        public float comboBoostPerStep = 4f;
+        [UnityEngine.Tooltip("추가 속도가 붙어 있는 시간 (초)")]
+        public float comboBoostTime = 1.5f;
 
         [UnityEngine.Header("공중에서 먹기")]
         [UnityEngine.Tooltip("먹는 동안 조종이 굳는 시간 (초)")]
@@ -113,9 +117,14 @@ namespace DragonRecipe.Core
     /// <summary>사냥 계산 (순수 함수 → 테스트 가능)</summary>
     public static class HuntRules
     {
+        /// <summary>연속 사냥으로 돌려받는 스태미나 (단독 사냥은 0)</summary>
         /// <param name="combo">1 = 단독, 2 = 두 번째 연속 …</param>
-        public static float ComboMultiplier(int combo, HuntSettings h)
-            => UnityEngine.Mathf.Min(h.comboMaxMultiplier, 1f + h.comboStep * UnityEngine.Mathf.Max(0, combo - 1));
+        public static float ComboStamina(int combo, HuntSettings h)
+            => UnityEngine.Mathf.Min(h.comboStaminaMax, h.comboStaminaPerStep * UnityEngine.Mathf.Max(0, combo - 1));
+
+        /// <summary>연속 사냥으로 잠깐 붙는 추가 속도 (단독 사냥은 0, 상한 없음)</summary>
+        public static float ComboBoost(int combo, HuntSettings h)
+            => h.comboBoostPerStep * UnityEngine.Mathf.Max(0, combo - 1);
 
         /// <summary>추락할 때 떨어뜨리는 먹이 수 (반올림: 1개 들고 있으면 1개 다 잃음)</summary>
         public static int DropCount(int carried, float fraction)

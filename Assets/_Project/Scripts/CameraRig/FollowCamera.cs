@@ -22,6 +22,8 @@ namespace DragonRecipe.CameraRig
         public float fovSpeedMin = 15f;
         public float fovSpeedMax = 38f;
         public float extraDistanceAtMaxSpeed = 3f;
+        [Tooltip("추가 속도(연속 사냥 보상)가 붙어 있는 동안 더 넓어지는 시야각")]
+        public float boostFov = 8f;
 
         Camera _cam;
 
@@ -47,7 +49,8 @@ namespace DragonRecipe.CameraRig
             float kr = 1f - Mathf.Exp(-rotationSmoothing * Time.deltaTime);
             transform.position = Vector3.Lerp(transform.position, pos, k);
             transform.rotation = Quaternion.Slerp(transform.rotation, rot, kr);
-            _cam.fieldOfView = Mathf.Lerp(_cam.fieldOfView, Mathf.Lerp(baseFov, maxFov, t), k);
+            float boost = target.IsFlying && target.Model.IsBoosting ? boostFov : 0f;
+            _cam.fieldOfView = Mathf.Lerp(_cam.fieldOfView, Mathf.Lerp(baseFov, maxFov, t) + boost, k);
         }
 
         void ComputeGoal(out Vector3 pos, out Quaternion rot, float speedT)

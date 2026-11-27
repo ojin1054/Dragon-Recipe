@@ -103,6 +103,10 @@ namespace DragonRecipe.Flight
                 target = glideAngle + s * amp * _flapStrength;
                 _current = target; // 날갯짓은 즉시 반영
             }
+            else if (controller.Model != null && controller.Model.IsBoosting)
+            {
+                target = Mathf.Lerp(glideAngle, foldedAngle, 0.4f); // 추가 속도: 날개를 반쯤 접고 쏜살같이
+            }
             else
             {
                 target = glideAngle + Mathf.Sin(Time.time * 3f) * 3f; // 활공 중 살짝 흔들림

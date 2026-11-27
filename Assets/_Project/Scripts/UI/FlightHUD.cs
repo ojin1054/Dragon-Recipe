@@ -98,6 +98,7 @@ namespace DragonRecipe.UI
         void OnEnable()
         {
             if (session) session.Feedback += ShowFeedback;
+            if (session) session.Caught += OnCaught;
             if (dragon) dragon.Flapped += OnFlapped;
             if (dragon) dragon.Damaged += OnDamaged;
         }
@@ -105,6 +106,7 @@ namespace DragonRecipe.UI
         void OnDisable()
         {
             if (session) session.Feedback -= ShowFeedback;
+            if (session) session.Caught -= OnCaught;
             if (dragon) dragon.Flapped -= OnFlapped;
             if (dragon) dragon.Damaged -= OnDamaged;
         }
@@ -137,6 +139,12 @@ namespace DragonRecipe.UI
                 _healthBar.anchoredPosition = _healthBarPos;
             }
             healthFill.color = color;
+        }
+
+        /// <summary>연속 사냥: 스태미나가 차오르니 바가 번뜩인다</summary>
+        void OnCaught(int combo)
+        {
+            if (combo >= 2) _flash = 1f;
         }
 
         void OnFlapped(FlapOutcome outcome)

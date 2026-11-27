@@ -113,7 +113,12 @@ namespace DragonRecipe.Tests
             var light = spawner.All.Where(p => p.IsAvailable && !p.Data.struggles).Take(2).ToArray();
             Assert.AreEqual(2, light.Length);
             snatch.Invoke(session, new object[] { light[0] });
+            session.dragon.Model.Stamina = 10f;
+            float speedBefore = session.dragon.Model.Speed;
             snatch.Invoke(session, new object[] { light[1] });
+            Assert.AreEqual(10f + session.hunt.comboStaminaPerStep, session.dragon.Model.Stamina, 0.5f, "연속 사냥이면 스태미나가 참");
+            Assert.IsTrue(session.dragon.Model.IsBoosting, "연속 사냥이면 잠깐 속도가 붙음");
+            Assert.Greater(session.dragon.Model.Speed, speedBefore);
 
             Assert.AreEqual(2, session.Result.CarriedCount);
             Assert.AreEqual(2, session.CurrentCombo, "연달아 잡으면 연속 사냥");
