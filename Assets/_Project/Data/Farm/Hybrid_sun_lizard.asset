@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 29e87a99130bc944d9a5af9c2f80cf5d, type: 3}
+  m_Name: Hybrid_sun_lizard
+  m_EditorClassIdentifier: DragonRecipe.Runtime::DragonRecipe.Farm.HybridAnimalData
+  id: sun_lizard
+  displayName: "\uD0DC\uC591 \uB3C4\uB9C8\uBC40"
+  icon: {fileID: 0}
+  silhouette: {fileID: 0}
+  satiety: 5
+  traits:
+  - trait: 2
+    share: 1
+  buffs:
+  - stat: 1
+    multiplier: 1.4
+  buffFlights: 3

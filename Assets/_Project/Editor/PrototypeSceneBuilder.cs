@@ -188,6 +188,8 @@ namespace DragonRecipe.EditorTools
             if (created) cfg.care = new CareSettings();
             if (created || cfg.stages == null || cfg.stages.Length == 0) cfg.stages = stages;
             if (cfg.foods == null || cfg.foods.Length == 0) cfg.foods = foods;
+            if (cfg.farm == null) cfg.farm = new DragonRecipe.Farm.FarmSettings();
+            if (!cfg.combineTable) cfg.combineTable = FarmDataBuilder.EnsureTable();
             cfg.nestScene = Path.GetFileNameWithoutExtension(NestScenePath);
             cfg.flightScene = Path.GetFileNameWithoutExtension(ScenePath);
             EditorUtility.SetDirty(cfg);
@@ -246,12 +248,79 @@ namespace DragonRecipe.EditorTools
             camGo.AddComponent<AudioListener>();
             camGo.transform.position = new Vector3(5.5f, CliffHeight + 5.5f, -11f);
             camGo.transform.LookAt(new Vector3(-1.5f, CliffHeight + 1.5f, 0));
+            var nestCam = camGo.AddComponent<NestCamera>();
 
-            BuildNestUI(config);
+            nestCam.farmView = BuildFarmPen(world, mats);
+
+            BuildNestUI(config, nestCam);
             EditorSceneManager.SaveScene(scene, NestScenePath);
         }
 
-        static void BuildNestUI(GameConfig config)
+        /// <summary>우리 가운데. 절벽 왼쪽에 붙인 바위 언덕 위 (동굴과 겹치지 않게)</summary>
+        static readonly Vector3 PenCenter = new Vector3(-14.5f, CliffHeight, -1f);
+        static readonly Vector2 PenHalf = new Vector2(4f, 3.5f);
+
+        /// <summary>
+        /// 동물 농장 우리: 바위 언덕 + 풀밭 + 나무 울타리. 잡아 온 동물은 FarmPenView가 안에 풀어놓는다.
+        /// 농장을 열었을 때의 카메라 자리를 돌려준다.
+        /// </summary>
+        static Transform BuildFarmPen(Transform world, Mats mats)
+        {
+            var pen = new GameObject("FarmPen").transform;
+            pen.SetParent(world, false);
+            pen.position = PenCenter;
+
+            // 언덕: 절벽과 동굴 바닥에 이어 붙는다
+            Prim(PrimitiveType.Cube, "PenHill", pen, PenCenter + new Vector3(0.5f, -CliffHeight * 0.5f, 0f),
+                new Vector3(PenHalf.x * 2f + 5f, CliffHeight, PenHalf.y * 2f + 5f), mats.Rock);
+            Prim(PrimitiveType.Cube, "PenGrass", pen, PenCenter + new Vector3(0f, 0.03f, 0f),
+                new Vector3(PenHalf.x * 2f + 1.2f, 0.06f, PenHalf.y * 2f + 1.2f), mats.Grass, keepCollider: false);
+
+            // 울타리: 기둥 + 가로대 두 줄
+            var fence = new GameObject("Fence").transform;
+            fence.SetParent(pen, false);
+            const float postH = 1.1f, step = 1.35f;
+            Vector3[] corners =
+            {
+                PenCenter + new Vector3(-PenHalf.x, 0, -PenHalf.y), PenCenter + new Vector3(PenHalf.x, 0, -PenHalf.y),
+                PenCenter + new Vector3(PenHalf.x, 0, PenHalf.y), PenCenter + new Vector3(-PenHalf.x, 0, PenHalf.y)
+            };
+            for (int side = 0; side < 4; side++)
+            {
+                var a = corners[side];
+                var b = corners[(side + 1) % 4];
+                float len = Vector3.Distance(a, b);
+                int posts = Mathf.Max(1, Mathf.RoundToInt(len / step));
+                for (int i = 0; i < posts; i++)
+                {
+                    var p = Vector3.Lerp(a, b, i / (float)posts);
+                    Prim(PrimitiveType.Cube, $"Post_{side}_{i}", fence, p + Vector3.up * (postH * 0.5f),
+                        new Vector3(0.22f, postH, 0.22f), mats.Bark, keepCollider: false);
+                }
+                var mid = (a + b) * 0.5f;
+                var rot = Quaternion.LookRotation(b - a, Vector3.up);
+                foreach (float h in new[] { 0.45f, 0.85f })
+                {
+                    var rail = Prim(PrimitiveType.Cube, $"Rail_{side}_{h}", fence, mid + Vector3.up * h,
+                        new Vector3(0.1f, 0.12f, len + 0.2f), mats.Nest, keepCollider: false);
+                    rail.transform.rotation = rot;
+                }
+            }
+
+            var view = pen.gameObject.AddComponent<DragonRecipe.Farm.FarmPenView>();
+            view.area = pen;
+            view.halfSize = PenHalf - new Vector2(0.6f, 0.6f);
+            view.animalMaterial = mats.Prey;
+
+            // 농장을 열면: 우리를 화면 왼쪽에 두고(오른쪽은 농장 화면), 위에서 비스듬히 내려다본다
+            var camSpot = new GameObject("FarmCameraView").transform;
+            camSpot.SetParent(pen, false);
+            camSpot.position = PenCenter + new Vector3(6f, 7.5f, -12f);
+            camSpot.rotation = Quaternion.Euler(0f, 16f, 0f) * Quaternion.LookRotation(PenCenter - camSpot.position, Vector3.up);
+            return camSpot;
+        }
+
+        static void BuildNestUI(GameConfig config, NestCamera nestCam)
         {
             var es = new GameObject("EventSystem");
             es.AddComponent<EventSystem>();
@@ -288,6 +357,8 @@ namespace DragonRecipe.EditorTools
 
             BuildStoragePanel(ct);
             BuildCodex(canvasGo, ct);
+            var farm = BuildFarm(canvasGo, ct);
+            farm.nestCamera = nestCam;
             ui.eggButton = MakeIconButton(ct, "EggButton", new Vector2(1, 0), new Vector2(-560, 120), new Vector2(150, 150), _icons.egg, new Color(1f, 0.95f, 0.8f, 0.35f));
             ui.eggButton.gameObject.SetActive(false);
 
@@ -305,7 +376,45 @@ namespace DragonRecipe.EditorTools
             ui.debugResetButton = MakeButton(debug.transform, "ResetSave", new Vector2(1, 1), new Vector2(-170, -145), new Vector2(300, 70),
                 "저장 초기화", dbgColor, Color.white, out ui.debugResetLabel);
             ui.debugResetLabel.fontSize = 28;
+            farm.debugUpgradeButton = MakeButton(debug.transform, "UpgradePen", new Vector2(1, 1), new Vector2(-170, -230), new Vector2(300, 70),
+                "[디버그] 우리 확장", dbgColor, Color.white, out var penLabel);
+            penLabel.fontSize = 28;
             ui.debugRoot = debug;
+
+            // 농장을 열어 둔 동안 우리가 가려지지 않게 감출 것들
+            var hide = new System.Collections.Generic.List<CanvasGroup>();
+            foreach (var name in new[] { "StatusPanel", "ReportIcons", "StoragePanel", "CodexButton", "FarmButton", "EggButton", "FlyButton" })
+            {
+                var t = ct.Find(name);
+                if (!t) continue;
+                var g = t.GetComponent<CanvasGroup>();
+                hide.Add(g ? g : t.gameObject.AddComponent<CanvasGroup>());
+            }
+            farm.hideWhileOpen = hide.ToArray();
+        }
+
+        /// <summary>동물 농장: 울타리 버튼 → 우리 / 조합 / 버프 패널 (내용은 FarmPanel이 실행 중에 만든다)</summary>
+        static FarmPanel BuildFarm(GameObject canvasGo, Transform ct)
+        {
+            var farm = canvasGo.AddComponent<FarmPanel>();
+            farm.icons = _icons;
+            farm.font = UIFont;
+            farm.buttonSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            farm.openButton = MakeIconButton(ct, "FarmButton", new Vector2(0, 1), new Vector2(250, -590), new Vector2(120, 120),
+                _icons.fence ? _icons.fence : _icons.basket, new Color(1f, 1f, 1f, 0.3f));
+
+            // 덮개는 투명: 뒤의 우리가 보이고, 다른 둥지 버튼은 눌리지 않게만 막는다
+            var dim = MakeImage(ct, "FarmPanel", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(0, 0, 0, 0f));
+            Stretch(dim.rectTransform);
+            // 상자는 오른쪽에 작게 (왼쪽 절반에 우리가 보인다)
+            var box = MakeImage(dim.transform, "Box", new Vector2(1f, 0.5f), new Vector2(-30, -80), new Vector2(1300, 900), new Color(0.08f, 0.1f, 0.14f, 0.92f));
+            box.rectTransform.pivot = new Vector2(1f, 0.5f);
+            box.rectTransform.localScale = Vector3.one * 0.78f;
+            farm.closeButton = MakeIconButton(box.transform, "Close", new Vector2(1, 1), new Vector2(-60, -60), new Vector2(90, 90), _icons.no, new Color(1f, 1f, 1f, 0.2f));
+            farm.box = box.rectTransform;
+            farm.panel = dim.gameObject;
+            dim.gameObject.SetActive(false);
+            return farm;
         }
 
         /// <summary>둥지 오른쪽 위: 먹이 창고 (누르면 하나씩 먹임)</summary>
@@ -932,6 +1041,11 @@ namespace DragonRecipe.EditorTools
             carryHud.eatButton = eatBtn.gameObject;
             carryHud.carryIcons = MakeFlow(ct, "CarryIcons", new Vector2(0.5f, 1), new Vector2(0, -190), new Vector2(900, 70), TextAnchor.MiddleCenter, 52f, 34);
             carryHud.comboIcons = MakeFlow(ct, "ComboIcons", new Vector2(0.5f, 0.5f), new Vector2(0, 260), new Vector2(900, 90), TextAnchor.MiddleCenter, 64f, 56);
+
+            // 농장 버프: 일시정지 버튼 아래
+            var buffHud = canvasGo.AddComponent<BuffHUD>();
+            buffHud.icons = _icons;
+            buffHud.flow = MakeFlow(ct, "BuffIcons", new Vector2(1, 1), new Vector2(-40, -140), new Vector2(700, 70), TextAnchor.UpperRight, 48f, 30);
 
             var vis = canvasGo.AddComponent<MobileControlsVisibility>();
             vis.controlsRoot = mobile;

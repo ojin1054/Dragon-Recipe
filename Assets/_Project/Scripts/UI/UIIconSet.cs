@@ -50,6 +50,10 @@ namespace DragonRecipe.UI
         public Sprite leaf;
         public Sprite fish;
 
+        [Header("동물 농장")]
+        public Sprite fence;
+        public Sprite heart;
+
         public Sprite Trait(DragonRecipe.Food.FoodTrait t) => t switch
         {
             DragonRecipe.Food.FoodTrait.Meat => meat,

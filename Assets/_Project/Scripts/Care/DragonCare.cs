@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using DragonRecipe.Core;
+using DragonRecipe.Farm;
 using DragonRecipe.Flight;
 using DragonRecipe.Food;
 using UnityEngine;
@@ -53,6 +54,10 @@ namespace DragonRecipe.Care
         public static event Action<FeedOutcome> Fed;
         /// <summary>새 알을 부화시킴</summary>
         public static event Action Hatched;
+        /// <summary>농장 동물·조합·버프가 바뀜</summary>
+        public static event Action FarmChanged;
+        /// <summary>끝난 조합을 거둠 (성공 / 실패 연출용)</summary>
+        public static event Action<List<CombineResult>> CombinesCollected;
 
         public static void EnsureLoaded(GameConfig config)
         {
@@ -73,6 +78,11 @@ namespace DragonRecipe.Care
             s.storage ??= new List<StoredFood>();
             s.codexFoods ??= new List<CodexFood>();
             s.codexForms ??= new List<DragonForm>();
+            s.farm ??= new FarmState();
+            s.farm.animals ??= new List<FarmAnimal>();
+            s.farm.jobs ??= new List<CombineJob>();
+            s.farm.buffs ??= new List<ActiveBuff>();
+            s.farm.recipes ??= new List<RecipeRecord>();
             if (s.generation <= 0) s.generation = 1;
             if (s.stage == GrowthStage.Adult && s.form == DragonForm.None)
             {
@@ -98,13 +108,14 @@ namespace DragonRecipe.Care
 
         public static FoodData FindFood(string id) => Config ? Config.FindFood(id) : null;
 
-        /// <summary>현재 단계 + 굶주림을 반영한 비행 수치</summary>
+        /// <summary>현재 단계 + 굶주림 + 농장 버프를 반영한 비행 수치</summary>
         public static FlightParams CurrentFlightParams()
         {
             var data = CurrentStageData;
             if (data == null) return new FlightParams();
             Tick();
-            return CareLogic.FlightParamsFor(data.flight, State, Config.care);
+            var p = CareLogic.FlightParamsFor(data.flight, State, Config.care);
+            return FarmBuffs.Apply(p, State.farm.buffs);
         }
 
         /// <summary>
@@ -155,6 +166,12 @@ namespace DragonRecipe.Care
 
             if (result.Injured) State.injured = true;
             State.totalFlights++;
+            // 버프는 비행 횟수로 유지된다: 한 번 날고 오면 1씩 줄어든다
+            if (State.farm.buffs.Count > 0)
+            {
+                FarmLogic.CountDownBuffs(State.farm);
+                FarmChanged?.Invoke();
+            }
             LastFlightReport = report;
             Save();
 
@@ -174,6 +191,78 @@ namespace DragonRecipe.Care
             return true;
         }
 
+        // ───────────── 동물 농장 ─────────────
+
+        public static FarmState Farm => State?.farm;
+        public static FarmSettings FarmSettings => Config ? Config.farm : null;
+        public static CombineTable CombineTable => Config ? Config.combineTable : null;
+        static bool FarmReady => IsLoaded && Config.farm != null;
+
+        /// <summary>
+        /// [임시] 창고 먹이를 산 채로 우리에 옮긴다. 포획해서 바로 데려오는 기능이 합쳐지면 그쪽으로 바꾼다.
+        /// 우리가 가득 차면 false
+        /// </summary>
+        public static bool MoveStorageToFarm(int index)
+        {
+            if (!FarmReady || index < 0 || index >= State.storage.Count) return false;
+            var f = State.storage[index];
+            if (FarmLogic.AddAnimal(State.farm, Config.farm, f.id, f.trait, f.satiety, f.rare) == null) return false;
+            State.storage.RemoveAt(index);
+            Save();
+            FarmChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>우리의 동물을 드래곤에게 먹인다. 배가 꽉 찼으면 false</summary>
+        public static bool FeedFarmAnimal(string uid)
+        {
+            if (!FarmReady) return false;
+            Tick();
+            if (!FarmLogic.Feed(State.farm, Config.farm, Config.combineTable, State, Config.care, uid, out var o)) return false;
+            Save();
+            FarmChanged?.Invoke();
+            Fed?.Invoke(o.feed);
+            if (o.feed.stageChanged) StageChanged?.Invoke(o.feed.newStage);
+            return true;
+        }
+
+        public static CombineBlock CanCombine(string uidA, string uidB, out CombineRecipe recipe)
+        {
+            recipe = null;
+            if (!FarmReady || !Config.combineTable) return CombineBlock.NoRecipe;
+            return FarmLogic.CanCombine(State.farm, Config.farm, Config.combineTable, uidA, uidB, out recipe);
+        }
+
+        public static bool StartCombine(string uidA, string uidB)
+        {
+            if (!FarmReady || !Config.combineTable) return false;
+            if (FarmLogic.StartCombine(State.farm, Config.farm, Config.combineTable, uidA, uidB, Clock()) == null) return false;
+            Save();
+            FarmChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>끝난 조합을 거둔다 (둥지에서 주기적으로 부름)</summary>
+        public static List<CombineResult> CollectCombines()
+        {
+            if (!FarmReady || !Config.combineTable || State.farm.jobs.Count == 0) return null;
+            var results = FarmLogic.CollectReady(State.farm, Config.farm, Config.combineTable, Clock());
+            if (results.Count == 0) return results;
+            Save();
+            FarmChanged?.Invoke();
+            CombinesCollected?.Invoke(results);
+            return results;
+        }
+
+        /// <summary>우리 확장. 상점이 생기면 상점에서 값을 치른 뒤 부른다</summary>
+        public static bool UpgradePen()
+        {
+            if (!FarmReady || !FarmLogic.UpgradePen(State.farm, Config.farm)) return false;
+            Save();
+            FarmChanged?.Invoke();
+            return true;
+        }
+
         /// <summary>성체가 된 뒤 새 알을 부화시킨다 (도감은 이어짐)</summary>
         public static bool HatchNewEgg()
         {
@@ -182,6 +271,7 @@ namespace DragonRecipe.Care
             LastFlightReport = null;
             Save();
             Hatched?.Invoke();
+            FarmChanged?.Invoke();
             StageChanged?.Invoke(State.stage);
             return true;
         }
@@ -202,6 +292,7 @@ namespace DragonRecipe.Care
             Tick();
             State.lastTickUtc -= TimeSpan.FromHours(hours).Ticks;
             Tick();
+            FarmLogic.DebugAdvance(State.farm, TimeSpan.FromHours(hours));
             Save();
         }
 
@@ -215,6 +306,8 @@ namespace DragonRecipe.Care
             StageChanged = null;
             Fed = null;
             Hatched = null;
+            FarmChanged = null;
+            CombinesCollected = null;
             Clock = () => DateTime.UtcNow;
         }
 

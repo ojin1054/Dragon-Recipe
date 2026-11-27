@@ -40,3 +40,5 @@ MonoBehaviour:
   flame: {fileID: 21300000, guid: e45a82d81ec58d04499ca236693ccec2, type: 3}
   leaf: {fileID: 21300000, guid: 0e14c2bdcbb98704e8f1c94ed8f82953, type: 3}
   fish: {fileID: 21300000, guid: e6a31d780e286f34bae6a1a37c905962, type: 3}
+  fence: {fileID: 21300000, guid: b1a1459ac5bf03e45973c2ca356b20a7, type: 3}
+  heart: {fileID: 21300000, guid: b79299e061118c643ba771503708195c, type: 3}
