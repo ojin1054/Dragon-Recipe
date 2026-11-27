@@ -22,7 +22,6 @@ MonoBehaviour:
     stamina: 140
     health: 130
     attack: 14
-    mana: 10
   flight:
     gravity: 12
     liftCoefficient: 0.8

@@ -533,13 +533,13 @@ namespace DragonRecipe.EditorTools
             }
 
             // 예전에 만든 에셋: 새 값 채우기 (한 번만)
-            MigrateStage(hatch, awareness: 1f, new DragonStats { strength = 20f, stamina = 100f, health = 100f, attack = 8f, mana = 0f });
-            MigrateStage(juv, awareness: 0.7f, new DragonStats { strength = 35f, stamina = 140f, health = 130f, attack = 14f, mana = 10f });
-            MigrateStage(adult, awareness: 0.45f, new DragonStats { strength = 60f, stamina = 200f, health = 170f, attack = 22f, mana = 25f });
+            MigrateStage(hatch, awareness: 1f, new DragonStats { strength = 20f, stamina = 100f, health = 100f, attack = 8f });
+            MigrateStage(juv, awareness: 0.7f, new DragonStats { strength = 35f, stamina = 140f, health = 130f, attack = 14f });
+            MigrateStage(adult, awareness: 0.45f, new DragonStats { strength = 60f, stamina = 200f, health = 170f, attack = 22f });
             return new[] { hatch, juv, adult };
         }
 
-        /// <summary>자랄수록 동물이 늦게 알아채고(awareness), 능력치(힘·스태미나·체력·공격력·마나)가 오른다</summary>
+        /// <summary>자랄수록 동물이 늦게 알아채고(awareness), 능력치(힘·스태미나·체력·공격력)가 오른다</summary>
         static void MigrateStage(DragonStageData d, float awareness, DragonStats stats)
         {
             if (d.schema >= 2) return;

@@ -2,7 +2,7 @@ using DragonRecipe.Flight;
 
 namespace DragonRecipe.Care
 {
-    /// <summary>지금 드래곤의 능력치 (힘·스태미나·체력·공격력·마나)</summary>
+    /// <summary>지금 드래곤의 능력치 (힘·스태미나·체력·공격력)</summary>
     public static class CareStats
     {
         /// <summary>성장 단계 기본값 + 성체 모습 보너스 (굶주림·버프 전)</summary>

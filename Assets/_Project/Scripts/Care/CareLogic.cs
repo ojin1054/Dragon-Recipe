@@ -212,16 +212,16 @@ namespace DragonRecipe.Care
         public static DragonStats FormStatBonus(DragonForm form) => form switch
         {
             // 고기: 힘과 공격력
-            DragonForm.Hunter => new DragonStats { strength = 15f, stamina = 0f, health = 10f, attack = 10f, mana = 0f },
+            DragonForm.Hunter => new DragonStats { strength = 15f, stamina = 0f, health = 10f, attack = 10f },
             // 물고기: 지구력
-            DragonForm.Tide => new DragonStats { strength = 0f, stamina = 50f, health = 10f, attack = 0f, mana = 5f },
-            // 불: 공격력과 마나
-            DragonForm.Ember => new DragonStats { strength = 5f, stamina = 0f, health = 0f, attack = 8f, mana = 25f },
+            DragonForm.Tide => new DragonStats { strength = 0f, stamina = 50f, health = 10f, attack = 0f },
+            // 불: 공격력
+            DragonForm.Ember => new DragonStats { strength = 5f, stamina = 0f, health = 0f, attack = 12f },
             // 식물: 튼튼한 몸
-            DragonForm.Grove => new DragonStats { strength = 5f, stamina = 10f, health = 50f, attack = 0f, mana = 10f },
+            DragonForm.Grove => new DragonStats { strength = 5f, stamina = 10f, health = 50f, attack = 0f },
             // 골고루: 조금씩 다
-            DragonForm.Prism => new DragonStats { strength = 6f, stamina = 15f, health = 15f, attack = 4f, mana = 15f },
-            _ => new DragonStats { strength = 0f, stamina = 0f, health = 0f, attack = 0f, mana = 0f },
+            DragonForm.Prism => new DragonStats { strength = 6f, stamina = 15f, health = 15f, attack = 4f },
+            _ => new DragonStats { strength = 0f, stamina = 0f, health = 0f, attack = 0f },
         };
 
         /// <summary>이 드래곤의 능력치 = 성장 단계 기본값 + 성체 모습 보너스</summary>

@@ -18,8 +18,6 @@ namespace DragonRecipe.Flight
         public float health = 100f;
         [Tooltip("공격력. 동물 힘보다 높으면 버둥거림이 약해지고 걷어차이지 않는다")]
         public float attack = 8f;
-        [Tooltip("마나 (아직 쓰는 곳 없음: 나중에 브레스 등)")]
-        public float mana = 0f;
 
         public DragonStats Clone() => (DragonStats)MemberwiseClone();
 
@@ -29,7 +27,6 @@ namespace DragonRecipe.Flight
             stamina = a.stamina + b.stamina,
             health = a.health + b.health,
             attack = a.attack + b.attack,
-            mana = a.mana + b.mana,
         };
 
         /// <summary>힘 → 들 수 있는 무게, 스태미나 → 최대 스태미나, 체력 → 최대 체력</summary>

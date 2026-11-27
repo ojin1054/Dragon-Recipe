@@ -13,7 +13,7 @@ namespace DragonRecipe.Tests
         [Test]
         public void Stats_GoIntoFlightParams()
         {
-            var stats = new DragonStats { strength = 35f, stamina = 140f, health = 130f, attack = 14f, mana = 10f };
+            var stats = new DragonStats { strength = 35f, stamina = 140f, health = 130f, attack = 14f };
             var p = stats.ApplyTo(new FlightParams());
             Assert.AreEqual(35f, p.carryStrength, 0.001f);
             Assert.AreEqual(140f, p.maxStamina, 0.001f);
@@ -23,7 +23,7 @@ namespace DragonRecipe.Tests
         [Test]
         public void AdultForm_AddsStats_ChildDoesNot()
         {
-            var baseStats = new DragonStats { strength = 60f, stamina = 200f, health = 170f, attack = 22f, mana = 25f };
+            var baseStats = new DragonStats { strength = 60f, stamina = 200f, health = 170f, attack = 22f };
             var hunter = new DragonState { stage = GrowthStage.Adult, form = DragonForm.Hunter };
             var tide = new DragonState { stage = GrowthStage.Adult, form = DragonForm.Tide };
             var child = new DragonState { stage = GrowthStage.Juvenile, form = DragonForm.Hunter };

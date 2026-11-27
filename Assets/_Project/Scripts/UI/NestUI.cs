@@ -22,7 +22,7 @@ namespace DragonRecipe.UI
         public IconFlow statusIcons;
         [Tooltip("지난 비행 결과를 아이콘으로")]
         public IconFlow reportIcons;
-        [Tooltip("능력치 (힘·스태미나·체력·공격력·마나). 비우면 상태 아이콘 아래에 만든다")]
+        [Tooltip("능력치 (힘·스태미나·체력·공격력). 비우면 상태 아이콘 아래에 만든다")]
         public IconFlow statsIcons;
         public UIIconSet icons;
         public Button flyButton;
@@ -181,12 +181,12 @@ namespace DragonRecipe.UI
             CareIcons.Status(statusIcons, icons, s, c, celebrating);
         }
 
-        /// <summary>힘 · 스태미나 · 체력 · 공격력 · 마나 (굶주림·버프 반영)</summary>
+        /// <summary>힘 · 스태미나 · 체력 · 공격력 (굶주림·버프 반영)</summary>
         void RefreshStatsIcons()
         {
             if (!statsIcons || !icons) return;
             var st = CareStats.Current();
-            string key = $"{st.strength:0}|{st.stamina:0}|{st.health:0}|{st.attack:0}|{st.mana:0}";
+            string key = $"{st.strength:0}|{st.stamina:0}|{st.health:0}|{st.attack:0}";
             if (key == _statsKey) return;
             _statsKey = key;
 
@@ -195,8 +195,7 @@ namespace DragonRecipe.UI
                 .Icon(icons.strength).Text($"{st.strength:0}").Gap(18f)
                 .Icon(icons.stamina).Text($"{st.stamina:0}").Gap(18f)
                 .Icon(icons.heart).Text($"{st.health:0}").Gap(18f)
-                .Icon(icons.claw).Text($"{st.attack:0}").Gap(18f)
-                .Icon(icons.mana).Text($"{st.mana:0}");
+                .Icon(icons.claw).Text($"{st.attack:0}");
         }
 
         void RefreshReportIcons(DragonState s)

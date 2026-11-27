@@ -167,7 +167,9 @@ namespace DragonRecipe.Tests
             Assert.Less(session.Result.CarriedCount, spawner.All.Count());
 
             yield return null;
-            Assert.IsNotNull(GameObject.Find("LoadGauge"), "매단 동물이 있으면 힘 게이지가 보여야 함");
+            var hud = Object.FindFirstObjectByType<DragonRecipe.UI.CarryHUD>();
+            Assert.IsNotNull(hud.loadGauge, "힘 게이지가 없음");
+            Assert.IsTrue(hud.loadGauge.gameObject.activeInHierarchy, "매단 동물이 있으면 힘 게이지가 보여야 함");
 
             // 힘이 넘치면 비행이 흔들린다
             if (session.OverloadAmount > 0f)

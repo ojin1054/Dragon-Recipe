@@ -57,7 +57,6 @@ namespace DragonRecipe.UI
         [Header("능력치 (체력 = heart, 공격력 = claw)")]
         public Sprite strength;
         public Sprite stamina;
-        public Sprite mana;
 
         public Sprite Trait(DragonRecipe.Food.FoodTrait t) => t switch
         {
