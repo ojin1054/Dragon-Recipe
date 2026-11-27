@@ -18,8 +18,11 @@ namespace DragonRecipe.UI
         public Text hungerLabel;
         public Image growthFill;
         public Text growthLabel;
-        public Text statusText;
-        public Text reportText;
+        [Tooltip("드래곤 기분·상태를 아이콘으로")]
+        public IconFlow statusIcons;
+        [Tooltip("지난 비행 결과를 아이콘으로")]
+        public IconFlow reportIcons;
+        public UIIconSet icons;
         public Button flyButton;
 
         [Header("디버그 (에디터 / 개발 빌드에서만 보임)")]
@@ -35,6 +38,9 @@ namespace DragonRecipe.UI
         float _resetConfirmUntil;
         GrowthStage _shownStage;
         float _celebrateUntil;
+        string _statusKey;
+        FlightCareReport _shownReport;
+        int _shownFlights = -1;
 
         void Awake()
         {
@@ -98,35 +104,42 @@ namespace DragonRecipe.UI
                 };
             }
 
-            if (statusText) statusText.text = StatusLine(s, c);
-
-            if (reportText)
-            {
-                var r = DragonCare.LastFlightReport;
-                reportText.text = r != null ? $"지난 비행\n{r.Describe()}" : $"총 비행 {s.totalFlights}회";
-            }
+            RefreshStatusIcons(s, c);
+            RefreshReportIcons(s);
 
             if (debugResetLabel)
                 debugResetLabel.text = Time.unscaledTime < _resetConfirmUntil ? "한 번 더 누르면 초기화" : "저장 초기화";
         }
 
-        string StatusLine(DragonState s, CareSettings c)
+        // 아이콘은 GameObject를 만들기 때문에, 내용이 바뀔 때만 다시 그린다
+        void RefreshStatusIcons(DragonState s, CareSettings c)
         {
-            if (Time.time < _celebrateUntil)
-                return $"<color=#ffd84d>{CareLogic.StageName(s.stage)}(으)로 성장했어요!</color>";
+            if (!statusIcons || !icons) return;
+            bool celebrating = Time.time < _celebrateUntil;
+            string key = $"{CareIcons.MoodOf(s, c)}|{s.injured}|{celebrating}";
+            if (key == _statusKey) return;
+            _statusKey = key;
+            CareIcons.Status(statusIcons, icons, s, c, celebrating);
+        }
 
-            string line;
-            if (CareLogic.IsStarving(s))
-                line = "<color=#ff7766>굶주리고 있어요! 성장이 멈추고 비행할 힘이 약해졌어요.\n먹이를 잡아 오세요.</color>";
-            else if (CareLogic.IsHungry(s, c))
-                line = "<color=#ffcc55>배가 고파요. 사냥하러 나가요!</color>";
-            else if (s.hunger >= c.maxHunger - 0.5f)
-                line = "배가 불러요. 지금 잡아 온 먹이는 버려져요.";
+        void RefreshReportIcons(DragonState s)
+        {
+            if (!reportIcons || !icons) return;
+            var r = DragonCare.LastFlightReport;
+            if (r == _shownReport && s.totalFlights == _shownFlights) return;
+            _shownReport = r;
+            _shownFlights = s.totalFlights;
+
+            reportIcons.Clear();
+            if (r != null)
+            {
+                reportIcons.AddRow().Icon(icons.wing, 1.2f); // 지난 비행
+                CareIcons.Report(reportIcons, icons, r);
+            }
             else
-                line = "기분이 좋아요.";
-
-            if (s.injured) line += "\n<color=#ff8877>다친 상태예요 (치료약은 상점 단계에서)</color>";
-            return line;
+            {
+                reportIcons.AddRow().Icon(icons.wing).Text($"x{s.totalFlights}"); // 총 비행 횟수
+            }
         }
 
         static string FormatHours(float hours)

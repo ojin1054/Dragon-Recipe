@@ -16,6 +16,7 @@ MonoBehaviour:
   displayName: "\uBD88\uAF43\uB3C4\uB9C8\uBC40"
   satiety: 8
   trait: 2
+  icon: {fileID: 21300000, guid: dee5c809f9a672e41b9e7e589ac55052, type: 3}
   color: {r: 1, g: 0.3, b: 0.05, a: 1}
   bodySize: {x: 0.4, y: 0.25, z: 0.9}
   wanderSpeed: 3

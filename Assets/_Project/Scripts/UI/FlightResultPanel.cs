@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Text;
 using DragonRecipe.Care;
 using DragonRecipe.Core;
 using UnityEngine;
@@ -8,13 +6,16 @@ using UnityEngine.UI;
 
 namespace DragonRecipe.UI
 {
-    /// <summary>비행이 끝나면 결과를 보여주고 "다시 날기"로 둥지에 돌아간다.</summary>
+    /// <summary>비행이 끝나면 결과를 아이콘으로 보여주고, 다시 날기 / 둥지로 돌아가기.</summary>
     public class FlightResultPanel : MonoBehaviour
     {
         public FlightSession session;
         public GameObject panel;
-        public Text titleText;
-        public Text bodyText;
+        [Tooltip("착지 / 추락을 큰 아이콘으로")]
+        public IconFlow titleIcons;
+        [Tooltip("체공·속도·먹이·성장·부상을 아이콘으로")]
+        public IconFlow bodyIcons;
+        public UIIconSet icons;
         public Button retryButton;
         public Button nestButton;
         [Tooltip("결과 화면이 뜨기까지의 지연 (충돌 연출을 보여주려고)")]
@@ -66,63 +67,11 @@ namespace DragonRecipe.UI
             if (!panel) return;
             panel.SetActive(true);
 
-            if (titleText)
+            if (icons)
             {
-                titleText.text = r.reason switch
-                {
-                    FlightEndReason.Landed => "무사히 착지!",
-                    FlightEndReason.Crashed => "추락! 드래곤이 다쳤어요",
-                    _ => "멀리 떨어져 버렸어요… 드래곤이 다쳤어요"
-                };
-                titleText.color = r.Injured ? new Color(1f, 0.5f, 0.45f) : new Color(1f, 0.9f, 0.5f);
-            }
-
-            if (bodyText)
-            {
-                var sb = new StringBuilder();
-                sb.AppendLine($"체공 시간  {r.airtime:0.0} 초");
-                sb.AppendLine($"최고 속도  {r.maxSpeed * 3.6f:0} km/h");
-                sb.AppendLine($"완벽한 날갯짓  {r.perfectFlapCount} 회");
-                sb.AppendLine($"아슬아슬 낚아채기  {r.nearMissCount} 회");
-                sb.AppendLine();
-
-                if (r.caught.Count == 0)
-                {
-                    sb.AppendLine("잡은 먹이 없음");
-                }
-                else
-                {
-                    var counts = new Dictionary<string, int>();
-                    foreach (var c in r.caught)
-                    {
-                        string n = c.food ? c.food.displayName : "?";
-                        counts[n] = counts.TryGetValue(n, out int k) ? k + 1 : 1;
-                    }
-                    sb.Append("잡은 먹이  ");
-                    bool first = true;
-                    foreach (var kv in counts)
-                    {
-                        if (!first) sb.Append(", ");
-                        sb.Append($"{kv.Key} x{kv.Value}");
-                        first = false;
-                    }
-                    sb.AppendLine();
-                    sb.AppendLine($"포만도 합계  {r.TotalSatiety:0}");
-                }
-
-                // 드래곤 상태에 반영된 결과 (먹이 섭취 / 성장 / 부상)
-                var report = DragonCare.LastFlightReport;
-                if (report != null)
-                {
-                    sb.AppendLine();
-                    sb.AppendLine(report.Describe());
-                }
-                else if (r.Injured)
-                {
-                    sb.AppendLine();
-                    sb.AppendLine("<color=#ff8877>부상 상태 — 치료가 필요해요 (상점은 다음 단계에서)</color>");
-                }
-                bodyText.text = sb.ToString();
+                if (titleIcons) CareIcons.ResultTitle(titleIcons, icons, r);
+                // 드래곤 상태에 반영된 결과 (먹이 섭취 / 성장 / 부상)는 DragonCare가 이미 계산해 둠
+                if (bodyIcons) CareIcons.ResultBody(bodyIcons, icons, r, DragonCare.LastFlightReport);
             }
 
             if (retryButton && EventSystem.current)

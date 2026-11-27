@@ -10,6 +10,8 @@ namespace DragonRecipe.Care
     public class FlightCareReport
     {
         public int foodCount;
+        /// <summary>잡아 온 먹이 (아이콘 표시용)</summary>
+        public System.Collections.Generic.List<DragonRecipe.Food.FoodData> foods = new System.Collections.Generic.List<DragonRecipe.Food.FoodData>();
         public float absorbed;
         public float wasted;
         public float xpGained;
@@ -95,6 +97,7 @@ namespace DragonRecipe.Care
             foreach (var c in result.caught)
             {
                 if (c.food == null) continue;
+                report.foods.Add(c.food);
                 var o = CareLogic.Feed(State, Config.care, c.satiety, c.food.trait);
                 report.absorbed += o.absorbed;
                 report.wasted += o.wasted;

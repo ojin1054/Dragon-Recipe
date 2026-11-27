@@ -42,6 +42,8 @@ namespace DragonRecipe.EditorTools
             var stages = CreateStages();
             var foods = CreateFoods();
             var config = CreateGameConfig(stages);
+            _icons = CreateIconSet();
+            AssignFoodIcons(foods);
             var mats = new Mats();
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -98,6 +100,73 @@ namespace DragonRecipe.EditorTools
             };
             AssetDatabase.SaveAssets();
             Debug.Log($"[Dragon Recipe] 씬 생성 완료: {NestScenePath}, {ScenePath}");
+        }
+
+        // ───────────────────────── 아이콘 ─────────────────────────
+
+        const string IconDir = Root + "/Art/Icons";
+        static UIIconSet _icons;
+
+        /// <summary>Art/Icons의 PNG를 픽셀 스프라이트로 임포트하고 UIIconSet에 연결 (빈 칸만 채움)</summary>
+        static UIIconSet CreateIconSet()
+        {
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { IconDir }))
+                IconImportSettings.Apply(AssetDatabase.GUIDToAssetPath(guid), reimport: true);
+
+            var set = LoadOrCreate<UIIconSet>($"{DataDir}/UIIconSet.asset", out _);
+            foreach (var field in typeof(UIIconSet).GetFields())
+            {
+                if (field.FieldType != typeof(Sprite) || field.GetValue(set) as Sprite) continue;
+                var sprite = LoadIcon(ToSnake(field.Name));
+                if (sprite) field.SetValue(set, sprite);
+                else Debug.LogWarning($"[Dragon Recipe] 아이콘 없음: {IconDir}/icon_{ToSnake(field.Name)}.png");
+            }
+            EditorUtility.SetDirty(set);
+            return set;
+        }
+
+        static void AssignFoodIcons(FoodData[] foods)
+        {
+            foreach (var f in foods)
+            {
+                if (f.icon) continue;
+                f.icon = LoadIcon($"food_{f.id}");
+                EditorUtility.SetDirty(f);
+            }
+        }
+
+        static Sprite LoadIcon(string name) => AssetDatabase.LoadAssetAtPath<Sprite>($"{IconDir}/icon_{name}.png");
+
+        static string ToSnake(string camel)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (char ch in camel)
+            {
+                if (char.IsUpper(ch) && sb.Length > 0) sb.Append('_');
+                sb.Append(char.ToLowerInvariant(ch));
+            }
+            return sb.ToString();
+        }
+
+        static IconFlow MakeFlow(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, TextAnchor align, float iconSize, int fontSize)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = anchor;
+            rt.pivot = anchor;
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
+            var layout = go.AddComponent<VerticalLayoutGroup>();
+            layout.childAlignment = align;
+            layout.childControlWidth = layout.childControlHeight = true;
+            layout.childForceExpandWidth = layout.childForceExpandHeight = false;
+            var flow = go.AddComponent<IconFlow>();
+            flow.font = UIFont;
+            flow.alignment = align;
+            flow.iconSize = iconSize;
+            flow.fontSize = fontSize;
+            return flow;
         }
 
         static GameConfig CreateGameConfig(DragonStageData[] stages)
@@ -195,11 +264,10 @@ namespace DragonRecipe.EditorTools
             ui.growthFill = MakeBar(pt, "GrowthBar", new Vector2(30, -215), out ui.growthLabel);
             ui.growthFill.color = new Color(1f, 0.8f, 0.35f);
 
-            ui.statusText = MakeText(pt, "Status", new Vector2(0, 1), new Vector2(30, -300), new Vector2(700, 150), 30, TextAnchor.UpperLeft);
-            ui.statusText.rectTransform.pivot = new Vector2(0, 1);
+            ui.icons = _icons;
+            ui.statusIcons = MakeFlow(pt, "StatusIcons", new Vector2(0, 1), new Vector2(30, -290), new Vector2(700, 170), TextAnchor.UpperLeft, 52f, 34);
 
-            ui.reportText = MakeText(ct, "Report", new Vector2(0, 0), new Vector2(40, 40), new Vector2(1000, 240), 30, TextAnchor.LowerLeft);
-            ui.reportText.rectTransform.pivot = new Vector2(0, 0);
+            ui.reportIcons = MakeFlow(ct, "ReportIcons", new Vector2(0, 0), new Vector2(40, 40), new Vector2(1000, 320), TextAnchor.LowerLeft, 52f, 36);
 
             ui.flyButton = MakeButton(ct, "FlyButton", new Vector2(1, 0), new Vector2(-230, 120), new Vector2(380, 140),
                 "비행 나가기", new Color(1f, 0.75f, 0.35f), new Color(0.15f, 0.1f, 0.05f), out var flyLabel);
@@ -612,8 +680,9 @@ namespace DragonRecipe.EditorTools
             var result = canvasGo.AddComponent<FlightResultPanel>();
             result.session = session;
             result.panel = resultPanel.gameObject;
-            result.titleText = MakeText(resultPanel.transform, "Title", new Vector2(0.5f, 1), new Vector2(0, -70), new Vector2(860, 90), 52, TextAnchor.MiddleCenter);
-            result.bodyText = MakeText(resultPanel.transform, "Body", new Vector2(0.5f, 0.5f), new Vector2(0, 10), new Vector2(780, 400), 32, TextAnchor.UpperLeft);
+            result.icons = _icons;
+            result.titleIcons = MakeFlow(resultPanel.transform, "TitleIcons", new Vector2(0.5f, 1), new Vector2(0, -75), new Vector2(860, 110), TextAnchor.MiddleCenter, 60f, 40);
+            result.bodyIcons = MakeFlow(resultPanel.transform, "BodyIcons", new Vector2(0.5f, 0.5f), new Vector2(0, 10), new Vector2(780, 400), TextAnchor.UpperLeft, 52f, 36);
 
             var btnImg = MakeImage(resultPanel.transform, "RetryButton", new Vector2(0.5f, 0), new Vector2(-190, 80), new Vector2(340, 100), new Color(1f, 0.75f, 0.35f));
             btnImg.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");

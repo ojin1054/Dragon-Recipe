@@ -16,6 +16,7 @@ MonoBehaviour:
   displayName: "\uC5F0\uC5B4"
   satiety: 10
   trait: 1
+  icon: {fileID: 21300000, guid: 996f3e5710d8fb948aef1ac1a2028553, type: 3}
   color: {r: 1, g: 0.55, b: 0.45, a: 1}
   bodySize: {x: 0.4, y: 0.35, z: 1.1}
   wanderSpeed: 2

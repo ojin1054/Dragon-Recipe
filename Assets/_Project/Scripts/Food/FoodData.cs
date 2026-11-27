@@ -20,6 +20,9 @@ namespace DragonRecipe.Food
         public int satiety = 10;
         public FoodTrait trait = FoodTrait.Meat;
 
+        [Tooltip("결과 화면 등에 쓰는 아이콘")]
+        public Sprite icon;
+
         [Header("외형 (프리미티브 placeholder)")]
         public Color color = Color.white;
         public Vector3 bodySize = new Vector3(0.8f, 0.6f, 1.2f);

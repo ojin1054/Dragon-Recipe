@@ -45,6 +45,13 @@ namespace DragonRecipe.Tests
             Assert.IsNotNull(UnityEngine.Object.FindFirstObjectByType<NestDragonView>());
             Assert.AreEqual(DragonCare.Config.care.startingHunger, DragonCare.State.hunger, 0.1f);
             Assert.IsTrue(File.Exists(_savePath), "처음 불러올 때 저장 파일이 만들어져야 함");
+
+            var ui = UnityEngine.Object.FindFirstObjectByType<DragonRecipe.UI.NestUI>();
+            Assert.IsNotNull(ui.icons, "아이콘 세트가 연결되지 않음");
+            Assert.IsNotNull(ui.icons.faceHappy, "아이콘 스프라이트가 비어 있음");
+            Assert.Greater(ui.statusIcons.transform.childCount, 0, "상태 아이콘이 그려지지 않음");
+            var faces = ui.statusIcons.GetComponentsInChildren<UnityEngine.UI.Image>();
+            Assert.IsTrue(System.Array.Exists(faces, i => i.sprite == ui.icons.faceHappy), "포만도 50%인데 기분 좋음 얼굴이 없음");
         }
 
         [UnityTest]

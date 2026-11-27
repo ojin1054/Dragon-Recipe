@@ -68,6 +68,16 @@ namespace DragonRecipe.Tests
             Assert.Less(session.dragon.transform.position.y, startY);
             Debug.Log($"[Smoke] 결과={ended.reason}, 체공={ended.airtime:0.0}s, 최고속도={ended.maxSpeed:0.0}m/s, 먹이={ended.caught.Count}");
 
+            // 결과 화면이 아이콘으로 그려지는지 (기본 1.2초 뒤 표시)
+            var panel = Object.FindFirstObjectByType<DragonRecipe.UI.FlightResultPanel>();
+            yield return new WaitForSeconds(panel.showDelay + 0.2f);
+            Assert.IsTrue(panel.panel.activeSelf, "결과 화면이 안 뜸");
+            Assert.Greater(panel.titleIcons.transform.childCount, 0, "결과 제목 아이콘이 없음");
+            Assert.Greater(panel.bodyIcons.transform.childCount, 2, "결과 본문 아이콘이 부족함");
+            var titleImages = panel.titleIcons.GetComponentsInChildren<UnityEngine.UI.Image>();
+            var expected = ended.Injured ? panel.icons.boom : panel.icons.check;
+            Assert.IsTrue(System.Array.Exists(titleImages, i => i.sprite == expected), "착지/추락 아이콘이 결과와 맞지 않음");
+
             session.ResetFlight();
             Assert.AreEqual(FlightSession.State.Ready, session.Current);
         }
