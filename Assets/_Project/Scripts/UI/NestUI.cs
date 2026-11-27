@@ -24,6 +24,8 @@ namespace DragonRecipe.UI
         public IconFlow reportIcons;
         public UIIconSet icons;
         public Button flyButton;
+        [Tooltip("성체가 되면 나타나는 새 알 버튼 (두 번 눌러야 부화)")]
+        public Button eggButton;
 
         [Header("디버그 (에디터 / 개발 빌드에서만 보임)")]
         public GameObject debugRoot;
@@ -36,6 +38,7 @@ namespace DragonRecipe.UI
         static readonly Color HungerEmpty = new Color(1f, 0.4f, 0.35f);
 
         float _resetConfirmUntil;
+        float _eggConfirmUntil;
         GrowthStage _shownStage;
         float _celebrateUntil;
         string _statusKey;
@@ -48,6 +51,7 @@ namespace DragonRecipe.UI
             if (flyButton) flyButton.onClick.AddListener(SceneFlow.GoToFlight);
             if (debugAdvanceButton) debugAdvanceButton.onClick.AddListener(() => DragonCare.DebugAdvanceHours(1f));
             if (debugResetButton) debugResetButton.onClick.AddListener(OnResetPressed);
+            if (eggButton) eggButton.onClick.AddListener(OnEggPressed);
             if (debugRoot) debugRoot.SetActive(Application.isEditor || Debug.isDebugBuild);
             if (DragonCare.IsLoaded) _shownStage = DragonCare.State.stage;
         }
@@ -62,6 +66,34 @@ namespace DragonRecipe.UI
                 return;
             }
             _resetConfirmUntil = Time.unscaledTime + 3f; // 3초 안에 한 번 더 누르면 초기화
+        }
+
+        /// <summary>새 알: 3초 안에 한 번 더 눌러야 부화 (실수로 누르지 않게, 첫 번째에는 알이 흔들림)</summary>
+        void OnEggPressed()
+        {
+            if (Time.unscaledTime < _eggConfirmUntil)
+            {
+                _eggConfirmUntil = 0f;
+                if (DragonCare.HatchNewEgg())
+                {
+                    _shownStage = DragonCare.State.stage;
+                    _celebrateUntil = Time.time + 4f;
+                }
+                return;
+            }
+            _eggConfirmUntil = Time.unscaledTime + 3f;
+        }
+
+        void UpdateEggButton(DragonState s)
+        {
+            if (!eggButton) return;
+            bool adult = s.stage == GrowthStage.Adult;
+            if (eggButton.gameObject.activeSelf != adult) eggButton.gameObject.SetActive(adult);
+            if (!adult) return;
+            bool armed = Time.unscaledTime < _eggConfirmUntil;
+            var t = eggButton.transform;
+            t.localRotation = armed ? Quaternion.Euler(0, 0, Mathf.Sin(Time.unscaledTime * 25f) * 12f) : Quaternion.identity;
+            t.localScale = Vector3.one * (armed ? 1.12f : 1f + Mathf.Sin(Time.unscaledTime * 2f) * 0.03f);
         }
 
         void Update()
@@ -105,6 +137,7 @@ namespace DragonRecipe.UI
             }
 
             RefreshStatusIcons(s, c);
+            UpdateEggButton(s);
             RefreshReportIcons(s);
 
             if (debugResetLabel)

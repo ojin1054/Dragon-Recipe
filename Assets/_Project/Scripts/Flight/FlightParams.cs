@@ -97,6 +97,16 @@ namespace DragonRecipe.Flight
         public float perfectBonus = 1.3f;
         public float spamPenalty = 0.35f;
 
+        [Header("먹이 매달기 (무게)")]
+        [Tooltip("이만큼의 무게를 매달면 '무게 1배'. 클수록 무거운 먹이도 가볍게 든다")]
+        public float carryStrength = 2f;
+        [Tooltip("무게 1배일 때 잃는 양력 비율 (최대 80%)")]
+        public float payloadLiftPenalty = 0.3f;
+        [Tooltip("무게 1배일 때 잃는 날갯짓 상승력 비율 (최대 70%)")]
+        public float payloadFlapPenalty = 0.25f;
+        [Tooltip("무게 1배일 때 둔해지는 선회·기울기 비율 (최대 60%)")]
+        public float payloadTurnPenalty = 0.3f;
+
         [Header("체력")]
         [Tooltip("비행을 시작할 때 체력. 0이 되면 추락(부상)으로 끝난다")]
         public float maxHealth = 100f;

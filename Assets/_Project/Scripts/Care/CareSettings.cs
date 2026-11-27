@@ -30,5 +30,13 @@ namespace DragonRecipe.Care
         [Range(0.1f, 1f)] public float starvingStaminaMultiplier = 0.6f;
         [Tooltip("굶주린 채 비행하면 날갯짓 상승력 배율")]
         [Range(0.1f, 1f)] public float starvingFlapLiftMultiplier = 0.8f;
+
+        [Header("먹이 창고")]
+        [Tooltip("창고에 둘 수 있는 먹이 수. 넘치면 버려진다")]
+        public int storageCapacity = 12;
+
+        [Header("성체 모습")]
+        [Tooltip("한 성질이 전체 먹이의 이 비율 이상이면 그 성질의 모습, 아니면 골고루 먹은 모습")]
+        [Range(0.26f, 1f)] public float formDominance = 0.4f;
     }
 }

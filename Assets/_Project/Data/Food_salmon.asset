@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0aab56ee24598744da4a962e0513aa3c, type: 3}
   m_Name: Food_salmon
   m_EditorClassIdentifier: DragonRecipe.Runtime::DragonRecipe.Food.FoodData
+  schema: 1
   id: salmon
   displayName: "\uC5F0\uC5B4"
   satiety: 10
@@ -23,4 +24,9 @@ MonoBehaviour:
   flees: 1
   fleeSpeed: 4
   fleeRadius: 25
+  herdMin: 1
+  herdMax: 1
+  scatterSpeed: 5
+  carryWeight: 0.5
+  struggles: 0
   spawnWeight: 2

@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0aab56ee24598744da4a962e0513aa3c, type: 3}
   m_Name: Food_sheep
   m_EditorClassIdentifier: DragonRecipe.Runtime::DragonRecipe.Food.FoodData
+  schema: 1
   id: sheep
   displayName: "\uC591"
   satiety: 12
@@ -23,4 +24,9 @@ MonoBehaviour:
   flees: 0
   fleeSpeed: 0
   fleeRadius: 25
+  herdMin: 3
+  herdMax: 5
+  scatterSpeed: 5
+  carryWeight: 1
+  struggles: 0
   spawnWeight: 3

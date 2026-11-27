@@ -46,7 +46,7 @@ namespace DragonRecipe.EditorTools
 
             var stages = CreateStages();
             var foods = CreateFoods();
-            var config = CreateGameConfig(stages);
+            var config = CreateGameConfig(stages, foods);
             _icons = CreateIconSet();
             AssignFoodIcons(foods);
             var mats = new Mats();
@@ -77,6 +77,11 @@ namespace DragonRecipe.EditorTools
             session.spawner = spawner;
             session.nest = nest;
             session.launchEdge = edge;
+
+            var carry = sessionGo.AddComponent<CarryVisual>();
+            carry.session = session;
+            carry.anchor = snatch.transform;
+            carry.material = mats.Prey;
 
             var bridge = sessionGo.AddComponent<FlightCareBridge>();
             bridge.config = config;
@@ -177,11 +182,12 @@ namespace DragonRecipe.EditorTools
             return flow;
         }
 
-        static GameConfig CreateGameConfig(DragonStageData[] stages)
+        static GameConfig CreateGameConfig(DragonStageData[] stages, FoodData[] foods)
         {
             var cfg = LoadOrCreate<GameConfig>($"{DataDir}/GameConfig.asset", out bool created);
             if (created) cfg.care = new CareSettings();
             if (created || cfg.stages == null || cfg.stages.Length == 0) cfg.stages = stages;
+            if (cfg.foods == null || cfg.foods.Length == 0) cfg.foods = foods;
             cfg.nestScene = Path.GetFileNameWithoutExtension(NestScenePath);
             cfg.flightScene = Path.GetFileNameWithoutExtension(ScenePath);
             EditorUtility.SetDirty(cfg);
@@ -280,6 +286,11 @@ namespace DragonRecipe.EditorTools
 
             ui.reportIcons = MakeFlow(ct, "ReportIcons", new Vector2(0, 0), new Vector2(40, 40), new Vector2(1000, 320), TextAnchor.LowerLeft, 52f, 36);
 
+            BuildStoragePanel(ct);
+            BuildCodex(canvasGo, ct);
+            ui.eggButton = MakeIconButton(ct, "EggButton", new Vector2(1, 0), new Vector2(-560, 120), new Vector2(150, 150), _icons.egg, new Color(1f, 0.95f, 0.8f, 0.35f));
+            ui.eggButton.gameObject.SetActive(false);
+
             ui.flyButton = MakeButton(ct, "FlyButton", new Vector2(1, 0), new Vector2(-230, 120), new Vector2(380, 140),
                 "비행 나가기", new Color(1f, 0.75f, 0.35f), new Color(0.15f, 0.1f, 0.05f), out var flyLabel);
             flyLabel.fontSize = 52;
@@ -295,6 +306,64 @@ namespace DragonRecipe.EditorTools
                 "저장 초기화", dbgColor, Color.white, out ui.debugResetLabel);
             ui.debugResetLabel.fontSize = 28;
             ui.debugRoot = debug;
+        }
+
+        /// <summary>둥지 오른쪽 위: 먹이 창고 (누르면 하나씩 먹임)</summary>
+        static void BuildStoragePanel(Transform ct)
+        {
+            var bg = MakeImage(ct, "StoragePanel", new Vector2(1, 1), new Vector2(-40, -380), new Vector2(560, 400), new Color(0.08f, 0.1f, 0.14f, 0.75f));
+            bg.rectTransform.pivot = new Vector2(1, 1);
+            var panel = bg.gameObject.AddComponent<StoragePanel>();
+            panel.icons = _icons;
+            panel.font = UIFont;
+            panel.buttonSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            panel.header = MakeFlow(bg.transform, "Header", new Vector2(0, 1), new Vector2(24, -16), new Vector2(500, 70), TextAnchor.UpperLeft, 52f, 34);
+
+            var gridGo = new GameObject("Grid", typeof(RectTransform));
+            gridGo.transform.SetParent(bg.transform, false);
+            var rt = gridGo.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0, 1);
+            rt.anchoredPosition = new Vector2(24, -100);
+            rt.sizeDelta = new Vector2(512, 300);
+            var grid = gridGo.AddComponent<GridLayoutGroup>();
+            grid.cellSize = new Vector2(92, 92);
+            grid.spacing = new Vector2(12, 12);
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = 5;
+            panel.grid = rt;
+        }
+
+        /// <summary>도감: 책 버튼 → 먹이 / 성체 모습 기록 패널</summary>
+        static void BuildCodex(GameObject canvasGo, Transform ct)
+        {
+            var codex = canvasGo.AddComponent<CodexPanel>();
+            codex.icons = _icons;
+            codex.openButton = MakeIconButton(ct, "CodexButton", new Vector2(0, 1), new Vector2(110, -590), new Vector2(120, 120), _icons.book, new Color(1f, 1f, 1f, 0.3f));
+
+            var dim = MakeImage(ct, "CodexPanel", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(0, 0, 0, 0.6f));
+            Stretch(dim.rectTransform);
+            var box = MakeImage(dim.transform, "Box", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1100, 860), new Color(0.08f, 0.1f, 0.14f, 0.95f));
+            var title = MakeFlow(box.transform, "Title", new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(1000, 90), TextAnchor.MiddleCenter, 72f, 40);
+            title.AddRow().Icon(_icons.book);
+            codex.foodFlow = MakeFlow(box.transform, "Foods", new Vector2(0, 1), new Vector2(60, -140), new Vector2(980, 480), TextAnchor.UpperLeft, 56f, 38);
+            codex.formFlow = MakeFlow(box.transform, "Forms", new Vector2(0, 0), new Vector2(60, 50), new Vector2(980, 120), TextAnchor.LowerLeft, 64f, 38);
+            codex.closeButton = MakeIconButton(box.transform, "Close", new Vector2(1, 1), new Vector2(-60, -60), new Vector2(90, 90), _icons.no, new Color(1f, 1f, 1f, 0.2f));
+            codex.panel = dim.gameObject;
+            dim.gameObject.SetActive(false);
+        }
+
+        static Button MakeIconButton(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, Sprite icon, Color bgColor)
+        {
+            var img = MakeImage(parent, name, anchor, pos, size, bgColor);
+            img.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            img.type = Image.Type.Sliced;
+            var btn = img.gameObject.AddComponent<Button>();
+            btn.targetGraphic = img;
+            var ic = MakeImage(img.transform, "Icon", new Vector2(0.5f, 0.5f), Vector2.zero, size * 0.72f, Color.white);
+            ic.sprite = icon;
+            ic.preserveAspect = true;
+            ic.raycastTarget = false;
+            return btn;
         }
 
         static Image MakeBar(Transform parent, string name, Vector2 pos, out Text label)
@@ -354,24 +423,52 @@ namespace DragonRecipe.EditorTools
             EditorUtility.SetDirty(adult);
             }
 
+            // 사냥 업데이트 이전에 만든 에셋: 새 값 채우기 (한 번만)
+            MigrateStage(hatch, awareness: 1f, carry: 2f);
+            MigrateStage(juv, awareness: 0.7f, carry: 3.5f);
+            MigrateStage(adult, awareness: 0.45f, carry: 6f);
             return new[] { hatch, juv, adult };
+        }
+
+        /// <summary>자랄수록 동물이 늦게 알아채고(awareness), 무거운 먹이도 가볍게 든다(carry)</summary>
+        static void MigrateStage(DragonStageData d, float awareness, float carry)
+        {
+            if (d.schema >= 1) return;
+            d.preyAwarenessScale = awareness;
+            d.flight.carryStrength = carry;
+            d.schema = 1;
+            EditorUtility.SetDirty(d);
         }
 
         static FoodData[] CreateFoods()
         {
             return new[]
             {
-                Food("sheep", "양", 12, FoodTrait.Meat, new Color(0.95f, 0.95f, 0.9f), new Vector3(0.9f, 0.7f, 1.3f),
-                    wander: 0.8f, flees: false, flee: 0f, weight: 3f),
-                Food("boar", "멧돼지", 20, FoodTrait.Meat, new Color(0.45f, 0.3f, 0.2f), new Vector3(0.8f, 0.7f, 1.5f),
-                    wander: 1.5f, flees: true, flee: 7f, weight: 2f),
-                Food("salmon", "연어", 10, FoodTrait.Fish, new Color(1f, 0.55f, 0.45f), new Vector3(0.4f, 0.35f, 1.1f),
-                    wander: 2f, flees: true, flee: 4f, weight: 2f),
-                Food("ember_lizard", "불꽃도마뱀", 8, FoodTrait.Fire, new Color(1f, 0.3f, 0.05f), new Vector3(0.4f, 0.25f, 0.9f),
-                    wander: 3f, flees: true, flee: 9f, weight: 1f),
-                Food("golden_melon", "황금멜론", 6, FoodTrait.Plant, new Color(1f, 0.85f, 0.2f), new Vector3(0.7f, 0.7f, 0.7f),
-                    wander: 0f, flees: false, flee: 0f, weight: 1.5f),
+                Hunt(Food("sheep", "양", 12, FoodTrait.Meat, new Color(0.95f, 0.95f, 0.9f), new Vector3(0.9f, 0.7f, 1.3f),
+                    wander: 0.8f, flees: false, flee: 0f, weight: 3f), carry: 1f, herdMin: 3, herdMax: 5),
+                Hunt(Food("boar", "멧돼지", 20, FoodTrait.Meat, new Color(0.45f, 0.3f, 0.2f), new Vector3(0.8f, 0.7f, 1.5f),
+                    wander: 1.5f, flees: true, flee: 7f, weight: 2f), carry: 1.6f, struggles: true),
+                Hunt(Food("salmon", "연어", 10, FoodTrait.Fish, new Color(1f, 0.55f, 0.45f), new Vector3(0.4f, 0.35f, 1.1f),
+                    wander: 2f, flees: true, flee: 4f, weight: 2f), carry: 0.5f),
+                Hunt(Food("ember_lizard", "불꽃도마뱀", 8, FoodTrait.Fire, new Color(1f, 0.3f, 0.05f), new Vector3(0.4f, 0.25f, 0.9f),
+                    wander: 3f, flees: true, flee: 9f, weight: 1f), carry: 0.3f),
+                Hunt(Food("golden_melon", "황금멜론", 6, FoodTrait.Plant, new Color(1f, 0.85f, 0.2f), new Vector3(0.7f, 0.7f, 0.7f),
+                    wander: 0f, flees: false, flee: 0f, weight: 1.5f), carry: 0.6f),
             };
+        }
+
+        /// <summary>사냥 관련 값 (무게 / 무리 / 버둥거림). 기존 에셋에는 한 번만 채운다</summary>
+        static FoodData Hunt(FoodData f, float carry, int herdMin = 1, int herdMax = 1, bool struggles = false)
+        {
+            if (f.schema >= 1) return f;
+            f.carryWeight = carry;
+            f.herdMin = herdMin;
+            f.herdMax = herdMax;
+            f.struggles = struggles;
+            f.scatterSpeed = 5f;
+            f.schema = 1;
+            EditorUtility.SetDirty(f);
+            return f;
         }
 
         static FoodData Food(string id, string name, int satiety, FoodTrait trait, Color color, Vector3 size,
@@ -718,6 +815,7 @@ namespace DragonRecipe.EditorTools
             snatch = snatchGo.AddComponent<SnatchZone>();
 
             root.AddComponent<GroundImpactFx>().controller = ctrl; // [임시] 지면에 닿을 때 흙 튐
+            root.AddComponent<DragonLook>().model = model; // 먹은 먹이에 따라 몸 색 / 성체 모습
             var visual = root.AddComponent<DragonVisual>();
             visual.controller = ctrl;
             visual.leftWing = wingL;
@@ -820,17 +918,32 @@ namespace DragonRecipe.EditorTools
             MakeText(crouchBtn.transform, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 80), 34, TextAnchor.MiddleCenter).text = "웅크리기";
             hud.crouchButton = crouchBtn.gameObject;
 
+            // 먹기 버튼 (먹이를 매달고 날 때만 보임): 날갯짓 버튼 왼쪽
+            var eatBtn = MakeImage(mobile.transform, "EatButton", new Vector2(1, 0), new Vector2(-500, 170), new Vector2(170, 170), new Color(1f, 0.55f, 0.4f, 0.5f));
+            eatBtn.sprite = stickBg.sprite;
+            SetControlPath(eatBtn.gameObject.AddComponent<OnScreenButton>(), "<Gamepad>/buttonWest");
+            var eatIcon = MakeImage(eatBtn.transform, "Icon", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(96, 96), Color.white);
+            eatIcon.sprite = _icons.meat;
+            eatIcon.raycastTarget = false;
+
+            var carryHud = canvasGo.AddComponent<CarryHUD>();
+            carryHud.session = session;
+            carryHud.icons = _icons;
+            carryHud.eatButton = eatBtn.gameObject;
+            carryHud.carryIcons = MakeFlow(ct, "CarryIcons", new Vector2(0.5f, 1), new Vector2(0, -190), new Vector2(900, 70), TextAnchor.MiddleCenter, 52f, 34);
+            carryHud.comboIcons = MakeFlow(ct, "ComboIcons", new Vector2(0.5f, 0.5f), new Vector2(0, 260), new Vector2(900, 90), TextAnchor.MiddleCenter, 64f, 56);
+
             var vis = canvasGo.AddComponent<MobileControlsVisibility>();
             vis.controlsRoot = mobile;
 
             // 결과 패널
-            var resultPanel = MakeImage(ct, "ResultPanel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900, 700), new Color(0.08f, 0.1f, 0.14f, 0.88f));
+            var resultPanel = MakeImage(ct, "ResultPanel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(960, 900), new Color(0.08f, 0.1f, 0.14f, 0.88f));
             var result = canvasGo.AddComponent<FlightResultPanel>();
             result.session = session;
             result.panel = resultPanel.gameObject;
             result.icons = _icons;
             result.titleIcons = MakeFlow(resultPanel.transform, "TitleIcons", new Vector2(0.5f, 1), new Vector2(0, -75), new Vector2(860, 110), TextAnchor.MiddleCenter, 60f, 40);
-            result.bodyIcons = MakeFlow(resultPanel.transform, "BodyIcons", new Vector2(0.5f, 0.5f), new Vector2(0, 10), new Vector2(780, 400), TextAnchor.UpperLeft, 52f, 36);
+            result.bodyIcons = MakeFlow(resultPanel.transform, "BodyIcons", new Vector2(0.5f, 1f), new Vector2(0, -150), new Vector2(860, 580), TextAnchor.UpperLeft, 46f, 34);
 
             var btnImg = MakeImage(resultPanel.transform, "RetryButton", new Vector2(0.5f, 0), new Vector2(-190, 80), new Vector2(340, 100), new Color(1f, 0.75f, 0.35f));
             btnImg.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");

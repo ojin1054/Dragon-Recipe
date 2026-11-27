@@ -24,6 +24,7 @@ namespace DragonRecipe.Flight
         float _current;
         Vector3 _bodyBase;
         float _crouch;
+        float _chew;
 
         void Awake()
         {
@@ -107,9 +108,19 @@ namespace DragonRecipe.Flight
                 target = glideAngle + Mathf.Sin(Time.time * 3f) * 3f; // 활공 중 살짝 흔들림
             }
 
+            // 공중에서 먹는 중: 날개를 펴고 고개를 숙였다 들었다 (와구와구)
+            bool eating = controller && controller.IsEating;
+            if (eating) target = glideAngle + 10f;
+            _chew = eating ? _chew + Time.deltaTime * 14f : 0f;
+
             _current = Mathf.Lerp(_current, target, 12f * Time.deltaTime);
             _crouch = Mathf.Lerp(_crouch, crouchTarget, 15f * Time.deltaTime);
-            if (body && controller) body.localPosition = _bodyBase + Vector3.up * (bob - 0.35f * _crouch);
+            if (body && controller)
+            {
+                body.localPosition = _bodyBase + Vector3.up * (bob - 0.35f * _crouch);
+                body.localRotation = eating ? Quaternion.Euler(12f + Mathf.Sin(_chew) * 10f, 0f, 0f)
+                    : Quaternion.Slerp(body.localRotation, Quaternion.identity, 10f * Time.deltaTime);
+            }
             if (leftWing) leftWing.localRotation = Quaternion.Euler(0, 0, _current);
             if (rightWing) rightWing.localRotation = Quaternion.Euler(0, 0, -_current);
             if (tail) tail.localRotation = Quaternion.Euler(Mathf.Sin(Time.time * 4f) * 6f, Mathf.Sin(Time.time * 2.3f) * 10f, 0);

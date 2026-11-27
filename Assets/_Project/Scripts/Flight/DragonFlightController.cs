@@ -39,6 +39,26 @@ namespace DragonRecipe.Flight
         /// <summary>(종류, 충돌 시 속도)</summary>
         public event Action<ImpactType, Vector3> Impacted;
 
+        /// <summary>공중에서 먹이를 먹는 중 (조종이 잠깐 굳음)</summary>
+        public bool IsEating => IsFlying && Time.time < _eatUntil;
+        float _eatUntil = -1f;
+
+        /// <summary>먹기 시작: duration 동안 스틱과 날갯짓이 듣지 않는다</summary>
+        public void BeginEat(float duration)
+        {
+            _eatUntil = Time.time + Mathf.Max(0f, duration);
+            _flapRequested = false;
+        }
+
+        /// <summary>땅 밖에서 피해를 입는다 (걷어차임 등). 체력이 다하면 추락</summary>
+        public void ApplyDamage(float damage)
+        {
+            if (!IsFlying || damage <= 0f) return;
+            Model.TakeDamage(damage);
+            Damaged?.Invoke(damage);
+            if (Model.IsDead) EndFlight(ImpactType.Crashed, Model.Velocity);
+        }
+
         Rigidbody _rb;
         bool _flapRequested;
         Vector3 _runStart;
@@ -96,6 +116,7 @@ namespace DragonRecipe.Flight
             _groundTime = 0f;
             _airTime = ReimpactDelay;
             IsFlying = true;
+            _eatUntil = -1f;
             input?.ConsumeFlap();
             Launched?.Invoke(plan);
             return plan;
@@ -117,15 +138,16 @@ namespace DragonRecipe.Flight
                 return;
             }
 
+            bool eating = IsEating;
             if (_flapRequested)
             {
                 _flapRequested = false;
-                Flapped?.Invoke(Model.TryFlap());
+                if (!eating) Flapped?.Invoke(Model.TryFlap());
             }
 
             float dt = Time.fixedDeltaTime;
             Vector3 from = Model.Position;
-            Model.Step(dt, input ? input.Move : Vector2.zero);
+            Model.Step(dt, input && !eating ? input.Move : Vector2.zero);
             Vector3 to = Model.Position;
 
             Vector3 delta = to - from;

@@ -12,9 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 54dd0a8767c2eed41ae8a339ff0b08cc, type: 3}
   m_Name: Stage_Juvenile
   m_EditorClassIdentifier: DragonRecipe.Runtime::DragonRecipe.Flight.DragonStageData
+  schema: 1
   stage: 1
   displayName: "\uCCAD\uC18C\uB144 \uB4DC\uB798\uACE4"
   bodyScale: 1.5
+  preyAwarenessScale: 0.7
   flight:
     gravity: 12
     liftCoefficient: 0.8
@@ -26,12 +28,27 @@ MonoBehaviour:
     minSpeed: 3
     stallSpeed: 8
     maxSpeed: 40
+    runTapAccel: 1.5
+    runMaxSpeed: 11
+    runFriction: 3
     launchSpeed: 12
+    launchMaxSpeed: 24
+    jumpZoneLength: 10
+    perfectJumpDistance: 2.5
+    crouchFullTime: 0.45
+    crouchDecel: 5
+    goodJumpThreshold: 0.6
+    launchRise: 2
+    launchMaxRise: 7
+    launchMaxPitch: 22
+    launchPerfectBonus: 1.25
+    stumblePitch: -15
     maxPitchUp: 35
     maxPitchDown: 70
     pitchResponse: 60
     turnRate: 65
     maxBank: 45
+    bankResponse: 90
     needsFlapping: 1
     flapLift: 4.5
     flapThrust: 2
@@ -44,5 +61,18 @@ MonoBehaviour:
     spamInterval: 0.25
     perfectBonus: 1.3
     spamPenalty: 0.35
+    carryStrength: 3.5
+    payloadLiftPenalty: 0.3
+    payloadFlapPenalty: 0.25
+    payloadTurnPenalty: 0.3
+    maxHealth: 100
+    touchDamage: 2
+    impactDamagePerSpeed: 6
+    impactFreeSpeed: 1
+    skidDamagePerSecond: 3
     safeLandingSink: 5.5
     safeLandingSpeed: 19
+    touchdownGrace: 1
+    groundFriction: 6
+    groundImpactLoss: 0.7
+    groundImpactMaxAngle: 20

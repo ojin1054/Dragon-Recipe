@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 namespace DragonRecipe.Flight
 {
     /// <summary>
-    /// 키보드(WASD/방향키 + Space, Shift/C, Esc/P), 게임패드(왼쪽 스틱 + A, B/RT, Start),
+    /// 키보드(WASD/방향키 + Space, Shift/C, Esc/P, E), 게임패드(왼쪽 스틱 + A, B/RT, Start, X),
     /// 모바일 화면 조이스틱/버튼(OnScreenStick/Button → 가상 게임패드)을 한 번에 받는다.
     /// </summary>
     public class DragonInput : MonoBehaviour
@@ -17,7 +17,9 @@ namespace DragonRecipe.Flight
         InputAction _flap;
         InputAction _crouch;
         InputAction _pause;
+        InputAction _eat;
         bool _flapBuffered;
+        bool _eatBuffered;
 
         /// <summary>일시정지 버튼(Esc / P / 패드 Start)이 눌림</summary>
         public event Action PausePressed;
@@ -58,8 +60,24 @@ namespace DragonRecipe.Flight
             return f;
         }
 
+        /// <summary>마지막 호출 이후 먹기 버튼(E / 패드 X)이 눌렸는지 (한 번 읽으면 지워짐)</summary>
+        public bool ConsumeEat()
+        {
+            bool e = _eatBuffered;
+            _eatBuffered = false;
+            return e;
+        }
+
         void Awake()
         {
+            _eat = new InputAction("Eat", InputActionType.Button);
+            _eat.AddBinding("<Keyboard>/e");
+            _eat.AddBinding("<Gamepad>/buttonWest");
+            _eat.performed += _ =>
+            {
+                if (!GamePause.IsPaused) _eatBuffered = true;
+            };
+
             _move = new InputAction("Move", InputActionType.Value, expectedControlType: "Vector2");
             _move.AddBinding("<Gamepad>/leftStick");
             _move.AddCompositeBinding("2DVector")
@@ -96,6 +114,7 @@ namespace DragonRecipe.Flight
             _flap.Enable();
             _crouch.Enable();
             _pause.Enable();
+            _eat.Enable();
         }
 
         void OnDisable()
@@ -104,7 +123,9 @@ namespace DragonRecipe.Flight
             _flap.Disable();
             _crouch.Disable();
             _pause.Disable();
+            _eat.Disable();
             _flapBuffered = false;
+            _eatBuffered = false;
         }
 
         void OnDestroy()
@@ -113,6 +134,7 @@ namespace DragonRecipe.Flight
             _flap.Dispose();
             _crouch.Dispose();
             _pause.Dispose();
+            _eat.Dispose();
         }
     }
 }
