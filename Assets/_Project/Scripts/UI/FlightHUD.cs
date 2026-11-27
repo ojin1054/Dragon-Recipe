@@ -1,3 +1,4 @@
+using DragonRecipe.Care;
 using DragonRecipe.Core;
 using DragonRecipe.Flight;
 using UnityEngine;
@@ -40,6 +41,17 @@ namespace DragonRecipe.UI
             _feedbackTimer = feedbackDuration;
         }
 
+        static string CareLine()
+        {
+            if (!DragonCare.IsLoaded) return "";
+            DragonCare.Tick();
+            var s = DragonCare.State;
+            var c = DragonCare.Config.care;
+            string status = CareLogic.IsStarving(s) ? "  <color=#ff7766>굶주림! 힘이 없어요</color>"
+                : CareLogic.IsHungry(s, c) ? "  <color=#ffcc55>배고픔</color>" : "";
+            return $"\n{CareLogic.StageName(s.stage)} · 포만도 {s.hunger / c.maxHunger * 100f:0}%{status}";
+        }
+
         void Update()
         {
             if (!session || !dragon) return;
@@ -53,7 +65,8 @@ namespace DragonRecipe.UI
                     $"고도 {dragon.Altitude:0} m\n" +
                     $"속도 {speed * 3.6f:0} km/h{stall}\n" +
                     $"체공 {session.Result.airtime:0.0} s\n" +
-                    $"먹이 {session.Result.caught.Count}  (아슬아슬 {session.Result.nearMissCount})";
+                    $"먹이 {session.Result.caught.Count}  (아슬아슬 {session.Result.nearMissCount})" +
+                    CareLine();
             }
 
             if (staminaFill)

@@ -34,13 +34,17 @@ namespace DragonRecipe.Flight
             _rb = GetComponent<Rigidbody>();
             _rb.isKinematic = true;
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
-            Model = new FlightModel(stage ? stage.flight : new FlightParams());
+            // SetStage가 먼저 불렸으면 (FlightCareBridge) 그 값을 유지
+            if (Model == null) Model = new FlightModel(stage ? stage.flight : new FlightParams());
         }
 
-        public void SetStage(DragonStageData data)
+        /// <param name="flightOverride">굶주림 등이 반영된 수치. null이면 단계 기본값</param>
+        public void SetStage(DragonStageData data, FlightParams flightOverride = null)
         {
             stage = data;
-            Model = new FlightModel(data.flight);
+            float yaw = Model != null ? Model.Yaw : transform.eulerAngles.y;
+            Model = new FlightModel(flightOverride ?? data.flight);
+            Model.Reset(transform.position, yaw, 0f); // 대기 중 위치/방향 유지
             transform.localScale = Vector3.one * data.bodyScale;
         }
 

@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/_Project/Scenes/Nest.unity
+    guid: 79aa65adadf027247bb55e6dc25c3f1d
+  - enabled: 1
     path: Assets/_Project/Scenes/FlightPrototype.unity
     guid: 9e919e7f31ad0f940858c119d7d0ee4e
   m_configObjects:
