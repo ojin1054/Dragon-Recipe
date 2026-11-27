@@ -35,5 +35,17 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d37f181f412578f42b8278090916aeea, type: 2}
   - {fileID: 11400000, guid: 8d7bf1f365c3ca549a23719ac9bbde04, type: 2}
   - {fileID: 11400000, guid: aed3bcbdeed991949ba039f86435a50e, type: 2}
+  farm:
+    basePenCapacity: 4
+    penUpgrades:
+    - cost: 100
+      addCapacity: 2
+    - cost: 250
+      addCapacity: 2
+    - cost: 500
+      addCapacity: 4
+    combineSlots: 1
+    maxActiveBuffs: 3
+  combineTable: {fileID: 11400000, guid: 56beec9f8baa1a349ab50d8c75f5cf5c, type: 2}
   nestScene: Nest
   flightScene: FlightPrototype

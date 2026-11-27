@@ -56,7 +56,7 @@ namespace DragonRecipe.Care
     [Serializable]
     public class DragonState
     {
-        public const int CurrentVersion = 2;
+        public const int CurrentVersion = 3;
 
         public int version = CurrentVersion;
         public string dragonName = "새끼 드래곤";
@@ -83,6 +83,9 @@ namespace DragonRecipe.Care
         // 도감은 새 알을 부화시켜도 이어진다
         public List<CodexFood> codexFoods = new List<CodexFood>();
         public List<DragonForm> codexForms = new List<DragonForm>();
+
+        /// <summary>둥지 동물 농장. 새 알을 부화시켜도 이어진다 (버프만 사라짐)</summary>
+        public DragonRecipe.Farm.FarmState farm = new DragonRecipe.Farm.FarmState();
 
         public static DragonState CreateNew(CareSettings s, DateTime nowUtc) => new DragonState
         {

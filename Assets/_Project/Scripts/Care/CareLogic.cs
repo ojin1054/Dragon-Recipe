@@ -162,7 +162,7 @@ namespace DragonRecipe.Care
         public const int CodexTraitReveal = 3;
 
         /// <summary>
-        /// 성체가 된 뒤 새 알을 부화시킨다. 도감과 비행 횟수, 세대만 이어진다.
+        /// 성체가 된 뒤 새 알을 부화시킨다. 도감과 비행 횟수, 세대, 농장이 이어진다 (농장 버프는 사라짐).
         /// </summary>
         public static DragonState HatchNewEgg(DragonState old, CareSettings c, DateTime nowUtc)
         {
@@ -171,6 +171,8 @@ namespace DragonRecipe.Care
             s.totalFlights = old.totalFlights;
             s.codexFoods = old.codexFoods;
             s.codexForms = old.codexForms;
+            s.farm = old.farm ?? new DragonRecipe.Farm.FarmState();
+            DragonRecipe.Farm.FarmLogic.OnNewEgg(s.farm);
             return s;
         }
 

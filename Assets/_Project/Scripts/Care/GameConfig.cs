@@ -12,6 +12,10 @@ namespace DragonRecipe.Care
         public DragonStageData[] stages;
         [Tooltip("모든 먹이 (먹이 창고 / 도감에서 id로 찾는다)")]
         public DragonRecipe.Food.FoodData[] foods;
+        [Header("동물 농장")]
+        public DragonRecipe.Farm.FarmSettings farm = new DragonRecipe.Farm.FarmSettings();
+        public DragonRecipe.Farm.CombineTable combineTable;
+
         public string nestScene = "Nest";
         public string flightScene = "FlightPrototype";
 
