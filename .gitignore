@@ -25,3 +25,6 @@
 .DS_Store
 Thumbs.db
 crashlytics-buildid.txt
+
+# Android 빌드 임시 파일
+/.utmp/
