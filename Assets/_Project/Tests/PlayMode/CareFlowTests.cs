@@ -64,7 +64,7 @@ namespace DragonRecipe.Tests
             yield return null;
 
             var dragon = UnityEngine.Object.FindFirstObjectByType<DragonFlightController>();
-            var stageDefault = DragonCare.CurrentStageData.flight.maxStamina;
+            var stageDefault = CareStats.Base().stamina;
             Assert.Less(dragon.Model.Params.maxStamina, stageDefault, "굶주렸는데 스태미나가 그대로");
         }
 

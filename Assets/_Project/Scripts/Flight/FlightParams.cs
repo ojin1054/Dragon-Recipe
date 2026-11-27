@@ -98,8 +98,8 @@ namespace DragonRecipe.Flight
         public float spamPenalty = 0.35f;
 
         [Header("먹이 매달기 (무게)")]
-        [Tooltip("이만큼의 무게를 매달면 '무게 1배'. 클수록 무거운 먹이도 가볍게 든다")]
-        public float carryStrength = 2f;
+        [Tooltip("드래곤의 힘 (DragonStats.strength가 들어감). 매단 동물 힘의 합이 이만큼이면 '무게 1배'")]
+        public float carryStrength = 20f;
         [Tooltip("무게 1배일 때 잃는 양력 비율 (최대 80%)")]
         public float payloadLiftPenalty = 0.3f;
         [Tooltip("무게 1배일 때 잃는 날갯짓 상승력 비율 (최대 70%)")]

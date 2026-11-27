@@ -35,7 +35,7 @@ namespace DragonRecipe.Tests
         public void HeavyPayload_SinksFaster()
         {
             var light = Glider(0f);
-            var heavy = Glider(3f);
+            var heavy = Glider(30f);
             for (int i = 0; i < 150; i++)
             {
                 light.Step(Dt, Vector2.zero);
@@ -48,7 +48,7 @@ namespace DragonRecipe.Tests
         public void HeavyPayload_TurnsSlower()
         {
             var light = Glider(0f);
-            var heavy = Glider(3f);
+            var heavy = Glider(30f);
             for (int i = 0; i < 20; i++) // 최대 기울기에 닿기 전까지
             {
                 light.Step(Dt, new Vector2(1, 0));
@@ -62,7 +62,7 @@ namespace DragonRecipe.Tests
         public void HeavyPayload_WeakensFlap()
         {
             var light = Glider(0f);
-            var heavy = Glider(3f);
+            var heavy = Glider(30f);
             light.TryFlap();
             heavy.TryFlap();
             Assert.Less(heavy.VerticalSpeed, light.VerticalSpeed);
@@ -71,11 +71,11 @@ namespace DragonRecipe.Tests
         [Test]
         public void StrongerDragon_CarriesSameWeightEasier()
         {
-            var weak = Glider(2f);
-            var strongParams = new FlightParams { carryStrength = 6f };
+            var weak = Glider(20f);
+            var strongParams = new FlightParams { carryStrength = 60f };
             var strong = new FlightModel(strongParams);
             strong.Reset(Vector3.zero, 0f, 16f);
-            strong.Payload = 2f;
+            strong.Payload = 20f;
             Assert.Greater(strong.LiftLoadMultiplier, weak.LiftLoadMultiplier);
         }
 
@@ -138,7 +138,7 @@ namespace DragonRecipe.Tests
         public void Payload_CountsOnlyCarried()
         {
             var food = ScriptableObject.CreateInstance<FoodData>();
-            food.carryWeight = 1f;
+            food.strength = 1f;
             try
             {
                 var h = new HuntSettings { rareWeightMultiplier = 1.5f };

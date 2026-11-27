@@ -12,11 +12,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 54dd0a8767c2eed41ae8a339ff0b08cc, type: 3}
   m_Name: Stage_Hatchling
   m_EditorClassIdentifier: DragonRecipe.Runtime::DragonRecipe.Flight.DragonStageData
-  schema: 1
+  schema: 2
   stage: 0
   displayName: "\uC5B4\uB9B0 \uB4DC\uB798\uACE4"
   bodyScale: 1
   preyAwarenessScale: 1
+  stats:
+    strength: 20
+    stamina: 100
+    health: 100
+    attack: 8
+    mana: 0
   flight:
     gravity: 12
     liftCoefficient: 0.55
@@ -61,7 +67,7 @@ MonoBehaviour:
     spamInterval: 0.25
     perfectBonus: 1.3
     spamPenalty: 0.35
-    carryStrength: 2
+    carryStrength: 20
     payloadLiftPenalty: 0.3
     payloadFlapPenalty: 0.25
     payloadTurnPenalty: 0.3

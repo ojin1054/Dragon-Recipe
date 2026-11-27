@@ -44,6 +44,10 @@ namespace DragonRecipe.Core
         public event Action<int> Caught;
         /// <summary>매달린 먹이가 버둥거림</summary>
         public event Action Struggled;
+        /// <summary>너무 무거워 들어 올리지 못함 (동물 힘의 합이 한계를 넘음)</summary>
+        public event Action<Prey> SnatchRefused;
+        /// <summary>힘이 넘쳐 몸이 휘청임 (세기 0~1)</summary>
+        public event Action<float> Overloaded;
 
         /// <summary>지금 이어지고 있는 연속 사냥 (0 = 없음)</summary>
         public int CurrentCombo { get; private set; }
@@ -51,6 +55,16 @@ namespace DragonRecipe.Core
         public float LastCatchTime { get; private set; } = -999f;
 
         float _nextStruggle;
+        float _nextOverloadShake;
+
+        /// <summary>드래곤의 힘 (버프 반영)</summary>
+        public float DragonStrength => dragon && dragon.Model != null ? dragon.Model.Params.carryStrength : 0f;
+        /// <summary>드래곤의 공격력</summary>
+        public float DragonAttack => dragon && dragon.Stats != null ? dragon.Stats.attack : 0f;
+        /// <summary>매단 동물 힘의 합</summary>
+        public float CarriedStrength => dragon && dragon.Model != null ? dragon.Model.Payload : 0f;
+        /// <summary>힘이 얼마나 넘치는지 0~1 (0 = 감당할 만함)</summary>
+        public float OverloadAmount => HuntRules.Overload(CarriedStrength, DragonStrength, hunt);
 
         static readonly Color Good = new Color(1f, 0.85f, 0.3f);
         static readonly Color Bad = new Color(1f, 0.45f, 0.4f);
@@ -94,6 +108,7 @@ namespace DragonRecipe.Core
                     if (CurrentCombo > 0 && Time.time - LastCatchTime > hunt.comboWindow) CurrentCombo = 0;
                     if (input && input.ConsumeEat()) EatInAir();
                     UpdateStruggle();
+                    UpdateOverload();
                     break;
                 case State.Ended:
                     input?.ConsumeFlap();
@@ -182,12 +197,22 @@ namespace DragonRecipe.Core
             float factor = FlightRules.NearMissFactor(dragon.Altitude, speed, dragon.Model.Params, nearMissAltitude);
             float mult = FlightRules.SnatchMultiplier(factor, nearMissMaxBonus);
             bool nearMiss = factor >= FlightRules.NearMissThreshold;
+            bool rare = prey.IsRare;
+
+            // 힘 겨루기: 동물 힘의 합이 한계를 넘으면 들어 올리지 못하고 놓친다
+            float preyStrength = HuntRules.PreyStrength(prey.Data, rare, hunt);
+            if (!HuntRules.CanLift(CarriedStrength, preyStrength, DragonStrength, hunt))
+            {
+                prey.Scatter(dragon.transform.position, 2.5f);
+                dragon.Model.Jolt(0f, -hunt.refusedDip, 0f);
+                SnatchRefused?.Invoke(prey);
+                return;
+            }
 
             // 연속 사냥: 짧은 간격으로 이어 잡을수록 포만도 배율이 붙는다
             CurrentCombo = Time.time - LastCatchTime <= hunt.comboWindow ? CurrentCombo + 1 : 1;
             LastCatchTime = Time.time;
             Result.maxCombo = Mathf.Max(Result.maxCombo, CurrentCombo);
-            bool rare = prey.IsRare;
 
             Result.caught.Add(new CaughtFood
             {
@@ -217,7 +242,8 @@ namespace DragonRecipe.Core
                 nearMiss ? Good : Info);
 
             // 버둥거리는 먹이를 어설프게(느리게 / 높게) 잡으면 걷어차인다
-            if (prey.Data.struggles && !nearMiss) dragon.ApplyDamage(hunt.kickDamage);
+            // 공격력이 동물 힘 이상이면 제압해서 걷어차이지 않는다
+            if (prey.Data.struggles && !nearMiss && HuntRules.Kicks(preyStrength, DragonAttack)) dragon.ApplyDamage(hunt.kickDamage);
         }
 
         void OnImpacted(ImpactType type, Vector3 velocity)
@@ -289,16 +315,42 @@ namespace DragonRecipe.Core
         /// <summary>버둥거리는 먹이를 매달고 있으면 가끔 몸이 홱 흔들린다</summary>
         void UpdateStruggle()
         {
-            int strugglers = 0;
+            float strugglers = 0f;
+            float attack = DragonAttack;
             foreach (var c in Result.caught)
-                if (c.Carried && c.food && c.food.struggles) strugglers++;
-            if (strugglers == 0 || Time.time < _nextStruggle) return;
+            {
+                if (!c.Carried || !c.food || !c.food.struggles) continue;
+                // 공격력으로 제압한 동물은 약하게 버둥거린다
+                strugglers += HuntRules.Kicks(HuntRules.CarryWeight(c, hunt), attack) ? 1f : hunt.subduedStruggle;
+            }
+            if (strugglers <= 0f || Time.time < _nextStruggle) return;
 
             _nextStruggle = Time.time + hunt.struggleInterval * UnityEngine.Random.Range(0.7f, 1.3f);
             float side = UnityEngine.Random.value < 0.5f ? -1f : 1f;
             float k = Mathf.Sqrt(strugglers);
             dragon.Model.Jolt(side * hunt.struggleBank * k, UnityEngine.Random.Range(-1f, 1f) * hunt.strugglePitch * k, hunt.struggleStamina * k);
             Struggled?.Invoke();
+        }
+
+        /// <summary>동물 힘의 합이 드래곤 힘을 넘으면 몸이 계속 휘청인다 (많이 넘칠수록 세고 잦게)</summary>
+        void UpdateOverload()
+        {
+            float k = OverloadAmount;
+            if (k <= 0f)
+            {
+                _nextOverloadShake = 0f;
+                return;
+            }
+            if (_nextOverloadShake <= 0f) _nextOverloadShake = Time.time + hunt.overloadShakeInterval * 0.5f;
+            if (Time.time < _nextOverloadShake) return;
+
+            float power = Mathf.Lerp(0.3f, 1f, k);
+            _nextOverloadShake = Time.time + hunt.overloadShakeInterval * Mathf.Lerp(1.6f, 0.6f, k) * UnityEngine.Random.Range(0.8f, 1.2f);
+            float side = UnityEngine.Random.value < 0.5f ? -1f : 1f;
+            dragon.Model.Jolt(side * hunt.overloadShakeBank * power,
+                UnityEngine.Random.Range(-1f, 0.3f) * hunt.overloadShakePitch * power, // 무게에 눌려 주로 아래로
+                hunt.overloadShakeStamina * power);
+            Overloaded?.Invoke(k);
         }
 
         void SetState(State s)

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0aab56ee24598744da4a962e0513aa3c, type: 3}
   m_Name: Food_ember_lizard
   m_EditorClassIdentifier: DragonRecipe.Runtime::DragonRecipe.Food.FoodData
-  schema: 1
+  schema: 2
   id: ember_lizard
   displayName: "\uBD88\uAF43\uB3C4\uB9C8\uBC40"
   satiety: 8
@@ -27,6 +27,6 @@ MonoBehaviour:
   herdMin: 1
   herdMax: 1
   scatterSpeed: 5
-  carryWeight: 0.3
+  strength: 3
   struggles: 0
   spawnWeight: 1

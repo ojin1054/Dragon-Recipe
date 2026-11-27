@@ -143,6 +143,45 @@ namespace DragonRecipe.Tests
         }
 
         [UnityTest]
+        public IEnumerator TooManyAnimals_Refused_AndOverloadShakes()
+        {
+            yield return SceneManager.LoadSceneAsync("FlightPrototype");
+            yield return null;
+
+            var session = Object.FindFirstObjectByType<FlightSession>();
+            var spawner = Object.FindFirstObjectByType<PreySpawner>();
+            typeof(FlightSession).GetMethod("Launch", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                .Invoke(session, null);
+            yield return null;
+
+            int refused = 0;
+            session.SnatchRefused += _ => refused++;
+            var snatch = typeof(FlightSession).GetMethod("OnSnatched", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            foreach (var prey in spawner.All.Where(p => p.IsAvailable).ToArray())
+                snatch.Invoke(session, new object[] { prey });
+
+            float strength = session.DragonStrength;
+            Assert.Greater(strength, 0f);
+            Assert.Greater(refused, 0, "힘이 모자라면 더 낚지 못해야 함");
+            Assert.LessOrEqual(session.CarriedStrength, strength * session.hunt.maxOverload + 0.01f, "한계를 넘게 매달면 안 됨");
+            Assert.Less(session.Result.CarriedCount, spawner.All.Count());
+
+            yield return null;
+            Assert.IsNotNull(GameObject.Find("LoadGauge"), "매단 동물이 있으면 힘 게이지가 보여야 함");
+
+            // 힘이 넘치면 비행이 흔들린다
+            if (session.OverloadAmount > 0f)
+            {
+                int shakes = 0;
+                session.Overloaded += _ => shakes++;
+                // 흔들림을 보기 전에 땅에 닿지 않게 높이 띄워 둔다
+                session.dragon.Model.Position += Vector3.up * 150f;
+                for (float t = 0; t < 2f && shakes == 0; t += Time.deltaTime) yield return null;
+                Assert.Greater(shakes, 0, "힘이 넘치는데 흔들리지 않음");
+            }
+        }
+
+        [UnityTest]
         public IEnumerator Pause_FreezesFlight_AndShowsMenu()
         {
             yield return SceneManager.LoadSceneAsync("FlightPrototype");

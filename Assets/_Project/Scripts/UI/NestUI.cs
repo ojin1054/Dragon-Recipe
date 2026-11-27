@@ -22,6 +22,8 @@ namespace DragonRecipe.UI
         public IconFlow statusIcons;
         [Tooltip("지난 비행 결과를 아이콘으로")]
         public IconFlow reportIcons;
+        [Tooltip("능력치 (힘·스태미나·체력·공격력·마나). 비우면 상태 아이콘 아래에 만든다")]
+        public IconFlow statsIcons;
         public UIIconSet icons;
         public Button flyButton;
         [Tooltip("성체가 되면 나타나는 새 알 버튼 (두 번 눌러야 부화)")]
@@ -44,6 +46,7 @@ namespace DragonRecipe.UI
         string _statusKey;
         FlightCareReport _shownReport;
         int _shownFlights = -1;
+        string _statsKey;
 
         void Awake()
         {
@@ -54,6 +57,28 @@ namespace DragonRecipe.UI
             if (eggButton) eggButton.onClick.AddListener(OnEggPressed);
             if (debugRoot) debugRoot.SetActive(Application.isEditor || Debug.isDebugBuild);
             if (DragonCare.IsLoaded) _shownStage = DragonCare.State.stage;
+            if (!statsIcons && statusIcons) statsIcons = BuildStatsFlow();
+        }
+
+        IconFlow BuildStatsFlow()
+        {
+            var src = (RectTransform)statusIcons.transform;
+            var go = new GameObject("StatsIcons", typeof(RectTransform));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(src.parent, false);
+            rt.anchorMin = src.anchorMin;
+            rt.anchorMax = src.anchorMax;
+            rt.pivot = new Vector2(src.pivot.x, 1f);
+            rt.sizeDelta = new Vector2(src.sizeDelta.x, 56f);
+            // 상태 아이콘 칸 바로 아래
+            rt.anchoredPosition = src.anchoredPosition + new Vector2(0f, -src.sizeDelta.y * src.pivot.y - 6f);
+            var flow = go.AddComponent<IconFlow>();
+            flow.font = statusIcons.font;
+            flow.fontSize = 30;
+            flow.iconSize = 42f;
+            flow.textColor = statusIcons.textColor;
+            flow.alignment = statusIcons.alignment;
+            return flow;
         }
 
         void OnResetPressed()
@@ -137,6 +162,7 @@ namespace DragonRecipe.UI
             }
 
             RefreshStatusIcons(s, c);
+            RefreshStatsIcons();
             UpdateEggButton(s);
             RefreshReportIcons(s);
 
@@ -153,6 +179,24 @@ namespace DragonRecipe.UI
             if (key == _statusKey) return;
             _statusKey = key;
             CareIcons.Status(statusIcons, icons, s, c, celebrating);
+        }
+
+        /// <summary>힘 · 스태미나 · 체력 · 공격력 · 마나 (굶주림·버프 반영)</summary>
+        void RefreshStatsIcons()
+        {
+            if (!statsIcons || !icons) return;
+            var st = CareStats.Current();
+            string key = $"{st.strength:0}|{st.stamina:0}|{st.health:0}|{st.attack:0}|{st.mana:0}";
+            if (key == _statsKey) return;
+            _statsKey = key;
+
+            statsIcons.Clear();
+            statsIcons.AddRow()
+                .Icon(icons.strength).Text($"{st.strength:0}").Gap(18f)
+                .Icon(icons.stamina).Text($"{st.stamina:0}").Gap(18f)
+                .Icon(icons.heart).Text($"{st.health:0}").Gap(18f)
+                .Icon(icons.claw).Text($"{st.attack:0}").Gap(18f)
+                .Icon(icons.mana).Text($"{st.mana:0}");
         }
 
         void RefreshReportIcons(DragonState s)

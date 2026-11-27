@@ -147,7 +147,7 @@ namespace DragonRecipe.UI
             flow.Clear();
             flow.AddRow().Icon(set.clock).Text($"{r.airtime:0.0}s").Gap(40f).Icon(set.wind).Text($"{r.maxSpeed * 3.6f:0} km/h");
             var skill = flow.AddRow().Icon(set.target).Text($"{r.nearMissCount}");
-            if (r.maxCombo >= 2) skill.Gap(40f).Icon(set.claw).Text($"x{r.maxCombo}", Good); // 연속 사냥
+            if (r.maxCombo >= 2) skill.Gap(40f).Text($"combo {r.maxCombo}", Good); // 연속 사냥
 
             // 잡은 먹이: 종류별 얼굴을 잡은 수만큼 (한 줄에 다 들어가게 종류당 최대 8개)
             var foods = new List<FoodData>();

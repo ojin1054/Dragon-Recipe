@@ -18,6 +18,8 @@ namespace DragonRecipe.Flight
         public float killY = -20f;
 
         public FlightModel Model { get; private set; }
+        /// <summary>지금 드래곤의 능력치 (힘·공격력 등. 비행 수치에 들어가는 값은 Model.Params에도 반영됨)</summary>
+        public DragonStats Stats { get; private set; }
         public bool IsFlying { get; private set; }
         /// <summary>바로 아래 지면까지 거리 (m)</summary>
         public float Altitude { get; private set; }
@@ -76,17 +78,20 @@ namespace DragonRecipe.Flight
             _rb.isKinematic = true;
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
             // SetStage가 먼저 불렸으면 (FlightCareBridge) 그 값을 유지
-            if (Model == null) Model = new FlightModel(stage ? stage.flight : new FlightParams());
+            if (Model == null) Model = new FlightModel(stage ? stage.FlightWithStats() : new FlightParams());
+            if (Stats == null) Stats = stage ? stage.stats.Clone() : new DragonStats();
             // [임시] 이미 만들어 둔 씬에도 흙 이펙트가 붙도록
             if (!GetComponent<GroundImpactFx>()) gameObject.AddComponent<GroundImpactFx>().controller = this;
         }
 
         /// <param name="flightOverride">굶주림 등이 반영된 수치. null이면 단계 기본값</param>
-        public void SetStage(DragonStageData data, FlightParams flightOverride = null)
+        /// <param name="stats">성체 모습 등이 반영된 능력치. null이면 단계 기본값</param>
+        public void SetStage(DragonStageData data, FlightParams flightOverride = null, DragonStats stats = null)
         {
             stage = data;
+            Stats = (stats ?? data.stats).Clone();
             float yaw = Model != null ? Model.Yaw : transform.eulerAngles.y;
-            Model = new FlightModel(flightOverride ?? data.flight);
+            Model = new FlightModel(flightOverride ?? data.FlightWithStats(Stats));
             Model.Reset(transform.position, yaw, 0f); // 대기 중 위치/방향 유지
             transform.localScale = Vector3.one * data.bodyScale;
         }

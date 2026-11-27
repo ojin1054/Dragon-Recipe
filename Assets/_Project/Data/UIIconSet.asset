@@ -42,3 +42,6 @@ MonoBehaviour:
   fish: {fileID: 21300000, guid: e6a31d780e286f34bae6a1a37c905962, type: 3}
   fence: {fileID: 21300000, guid: b1a1459ac5bf03e45973c2ca356b20a7, type: 3}
   heart: {fileID: 21300000, guid: b79299e061118c643ba771503708195c, type: 3}
+  strength: {fileID: 21300000, guid: 2a1a74b04e5d41e182add8dce77ed7e5, type: 3}
+  stamina: {fileID: 21300000, guid: a3df6f30931941edae4127cda0e355af, type: 3}
+  mana: {fileID: 21300000, guid: fef117c81ddd4beeaea80551a5e3cbd8, type: 3}

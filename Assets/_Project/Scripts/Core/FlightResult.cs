@@ -111,7 +111,23 @@ namespace DragonRecipe.Core
 
         [UnityEngine.Header("희귀 개체")]
         public float rareSatietyMultiplier = 2f;
+        [UnityEngine.Tooltip("희귀 개체의 힘 배율")]
         public float rareWeightMultiplier = 1.3f;
+
+        [UnityEngine.Header("힘 겨루기 (동물 힘의 합 vs 드래곤 힘)")]
+        [UnityEngine.Tooltip("동물 힘의 합이 드래곤 힘의 이 배수를 넘으면 더 낚지 못한다")]
+        public float maxOverload = 1.5f;
+        [UnityEngine.Tooltip("힘이 넘칠 때 몸이 휘청이는 평균 간격 (초). 많이 넘칠수록 잦아진다")]
+        public float overloadShakeInterval = 0.45f;
+        [UnityEngine.Tooltip("가장 많이 넘쳤을 때 휘청이는 기울기 (deg)")]
+        public float overloadShakeBank = 20f;
+        public float overloadShakePitch = 8f;
+        [UnityEngine.Tooltip("가장 많이 넘쳤을 때 휘청일 때마다 줄어드는 스태미나")]
+        public float overloadShakeStamina = 2.5f;
+        [UnityEngine.Tooltip("너무 무거워 못 들어 올릴 때 기수가 꺾이는 각도 (deg)")]
+        public float refusedDip = 6f;
+        [UnityEngine.Tooltip("공격력이 동물 힘 이상이면 버둥거림이 이 배율로 약해진다")]
+        public float subduedStruggle = 0.4f;
     }
 
     /// <summary>사냥 계산 (순수 함수 → 테스트 가능)</summary>
@@ -134,8 +150,29 @@ namespace DragonRecipe.Core
             return UnityEngine.Mathf.Clamp(n, 0, carried);
         }
 
-        public static float CarryWeight(CaughtFood c, HuntSettings h)
-            => c.food ? c.food.carryWeight * (c.rare ? h.rareWeightMultiplier : 1f) : 0f;
+        /// <summary>동물 한 마리의 힘 (희귀 개체는 더 셈)</summary>
+        public static float PreyStrength(FoodData food, bool rare, HuntSettings h)
+            => food ? food.strength * (rare ? h.rareWeightMultiplier : 1f) : 0f;
+
+        public static float CarryWeight(CaughtFood c, HuntSettings h) => PreyStrength(c.food, c.rare, h);
+
+        /// <summary>지금 매단 동물들에 이 동물을 더 매달 수 있는지 (힘이 약할수록 적게 낚는다)</summary>
+        public static bool CanLift(float payload, float preyStrength, float dragonStrength, HuntSettings h)
+            => payload + preyStrength <= UnityEngine.Mathf.Max(0f, dragonStrength) * h.maxOverload + 0.001f;
+
+        /// <summary>
+        /// 힘이 얼마나 넘치는지 0~1. 동물 힘의 합이 드래곤 힘 이하면 0, 낚을 수 있는 한계(maxOverload)면 1.
+        /// 0보다 크면 비행이 흔들린다.
+        /// </summary>
+        public static float Overload(float payload, float dragonStrength, HuntSettings h)
+        {
+            float str = UnityEngine.Mathf.Max(0.01f, dragonStrength);
+            if (payload <= str) return 0f;
+            return UnityEngine.Mathf.Clamp01((payload / str - 1f) / UnityEngine.Mathf.Max(0.01f, h.maxOverload - 1f));
+        }
+
+        /// <summary>공격력이 동물 힘보다 낮으면 버둥거리는 동물에게 걷어차인다</summary>
+        public static bool Kicks(float preyStrength, float attack) => attack < preyStrength;
 
         public static float Payload(IEnumerable<CaughtFood> caught, HuntSettings h)
         {

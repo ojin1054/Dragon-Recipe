@@ -119,7 +119,7 @@ namespace DragonRecipe.Care
             var data = CurrentStageData;
             if (data == null) return new FlightParams();
             Tick();
-            var p = CareLogic.FlightParamsFor(data.flight, State, Config.care);
+            var p = CareLogic.FlightParamsFor(data.FlightWithStats(CareStats.Base()), State, Config.care); // 능력치(힘·스태미나·체력) → 굶주림 → 버프
             p = FarmBuffs.Apply(p, State.farm.buffs);
             return FarmBuffs.Apply(p, TribeLogic.Blessings(State.tribes, TribeSettings));
         }

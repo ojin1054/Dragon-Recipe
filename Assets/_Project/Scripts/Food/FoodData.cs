@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace DragonRecipe.Food
 {
@@ -46,8 +47,9 @@ namespace DragonRecipe.Food
         public float scatterSpeed = 5f;
 
         [Header("사냥")]
-        [Tooltip("발톱에 매달았을 때 무게. 무거울수록 비행이 둔해진다")]
-        public float carryWeight = 1f;
+        [Tooltip("동물의 힘. 매단 동물 힘의 합이 드래곤 힘보다 크면 비행이 흔들리고, 무거울수록 둔해진다")]
+        [FormerlySerializedAs("carryWeight")]
+        public float strength = 10f;
         [Tooltip("매달린 채 버둥거려 드래곤을 흔든다. 제대로(아슬아슬하게) 못 잡으면 걷어차인다")]
         public bool struggles;
 

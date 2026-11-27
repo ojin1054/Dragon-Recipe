@@ -532,20 +532,21 @@ namespace DragonRecipe.EditorTools
             EditorUtility.SetDirty(adult);
             }
 
-            // 사냥 업데이트 이전에 만든 에셋: 새 값 채우기 (한 번만)
-            MigrateStage(hatch, awareness: 1f, carry: 2f);
-            MigrateStage(juv, awareness: 0.7f, carry: 3.5f);
-            MigrateStage(adult, awareness: 0.45f, carry: 6f);
+            // 예전에 만든 에셋: 새 값 채우기 (한 번만)
+            MigrateStage(hatch, awareness: 1f, new DragonStats { strength = 20f, stamina = 100f, health = 100f, attack = 8f, mana = 0f });
+            MigrateStage(juv, awareness: 0.7f, new DragonStats { strength = 35f, stamina = 140f, health = 130f, attack = 14f, mana = 10f });
+            MigrateStage(adult, awareness: 0.45f, new DragonStats { strength = 60f, stamina = 200f, health = 170f, attack = 22f, mana = 25f });
             return new[] { hatch, juv, adult };
         }
 
-        /// <summary>자랄수록 동물이 늦게 알아채고(awareness), 무거운 먹이도 가볍게 든다(carry)</summary>
-        static void MigrateStage(DragonStageData d, float awareness, float carry)
+        /// <summary>자랄수록 동물이 늦게 알아채고(awareness), 능력치(힘·스태미나·체력·공격력·마나)가 오른다</summary>
+        static void MigrateStage(DragonStageData d, float awareness, DragonStats stats)
         {
-            if (d.schema >= 1) return;
-            d.preyAwarenessScale = awareness;
-            d.flight.carryStrength = carry;
-            d.schema = 1;
+            if (d.schema >= 2) return;
+            if (d.schema < 1) d.preyAwarenessScale = awareness;
+            d.stats = stats;
+            d.flight = stats.ApplyTo(d.flight);
+            d.schema = 2;
             EditorUtility.SetDirty(d);
         }
 
@@ -554,28 +555,31 @@ namespace DragonRecipe.EditorTools
             return new[]
             {
                 Hunt(Food("sheep", "양", 12, FoodTrait.Meat, new Color(0.95f, 0.95f, 0.9f), new Vector3(0.9f, 0.7f, 1.3f),
-                    wander: 0.8f, flees: false, flee: 0f, weight: 3f), carry: 1f, herdMin: 3, herdMax: 5),
+                    wander: 0.8f, flees: false, flee: 0f, weight: 3f), strength: 10f, herdMin: 3, herdMax: 5),
                 Hunt(Food("boar", "멧돼지", 20, FoodTrait.Meat, new Color(0.45f, 0.3f, 0.2f), new Vector3(0.8f, 0.7f, 1.5f),
-                    wander: 1.5f, flees: true, flee: 7f, weight: 2f), carry: 1.6f, struggles: true),
+                    wander: 1.5f, flees: true, flee: 7f, weight: 2f), strength: 16f, struggles: true),
                 Hunt(Food("salmon", "연어", 10, FoodTrait.Fish, new Color(1f, 0.55f, 0.45f), new Vector3(0.4f, 0.35f, 1.1f),
-                    wander: 2f, flees: true, flee: 4f, weight: 2f), carry: 0.5f),
+                    wander: 2f, flees: true, flee: 4f, weight: 2f), strength: 5f),
                 Hunt(Food("ember_lizard", "불꽃도마뱀", 8, FoodTrait.Fire, new Color(1f, 0.3f, 0.05f), new Vector3(0.4f, 0.25f, 0.9f),
-                    wander: 3f, flees: true, flee: 9f, weight: 1f), carry: 0.3f),
+                    wander: 3f, flees: true, flee: 9f, weight: 1f), strength: 3f),
                 Hunt(Food("golden_melon", "황금멜론", 6, FoodTrait.Plant, new Color(1f, 0.85f, 0.2f), new Vector3(0.7f, 0.7f, 0.7f),
-                    wander: 0f, flees: false, flee: 0f, weight: 1.5f), carry: 0.6f),
+                    wander: 0f, flees: false, flee: 0f, weight: 1.5f), strength: 6f),
             };
         }
 
-        /// <summary>사냥 관련 값 (무게 / 무리 / 버둥거림). 기존 에셋에는 한 번만 채운다</summary>
-        static FoodData Hunt(FoodData f, float carry, int herdMin = 1, int herdMax = 1, bool struggles = false)
+        /// <summary>사냥 관련 값 (동물 힘 / 무리 / 버둥거림). 기존 에셋에는 한 번만 채운다</summary>
+        static FoodData Hunt(FoodData f, float strength, int herdMin = 1, int herdMax = 1, bool struggles = false)
         {
-            if (f.schema >= 1) return f;
-            f.carryWeight = carry;
-            f.herdMin = herdMin;
-            f.herdMax = herdMax;
-            f.struggles = struggles;
-            f.scatterSpeed = 5f;
-            f.schema = 1;
+            if (f.schema >= 2) return f;
+            if (f.schema < 1)
+            {
+                f.herdMin = herdMin;
+                f.herdMax = herdMax;
+                f.struggles = struggles;
+                f.scatterSpeed = 5f;
+            }
+            f.strength = strength; // 예전 무게(1 = 양)를 힘 단위(10 = 양)로
+            f.schema = 2;
             EditorUtility.SetDirty(f);
             return f;
         }

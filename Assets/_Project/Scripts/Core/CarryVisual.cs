@@ -41,6 +41,8 @@ namespace DragonRecipe.Core
         float _jolt; // 1 → 0
         float _eatPulse;
         float _lean; // 선회에 따라 탑이 바깥으로 기우는 정도 (deg)
+        float _heave; // 힘이 넘쳐 휘청일 때 1 → 0
+        float _heaveSide = 1f;
 
         void Awake()
         {
@@ -63,6 +65,8 @@ namespace DragonRecipe.Core
             if (!session) return;
             session.CarryChanged += Rebuild;
             session.Struggled += OnStruggled;
+            session.Overloaded += OnOverloaded;
+            session.SnatchRefused += OnRefused;
         }
 
         void OnDisable()
@@ -70,9 +74,20 @@ namespace DragonRecipe.Core
             if (!session) return;
             session.CarryChanged -= Rebuild;
             session.Struggled -= OnStruggled;
+            session.Overloaded -= OnOverloaded;
+            session.SnatchRefused -= OnRefused;
         }
 
         void OnStruggled() => _jolt = 1f;
+
+        void OnOverloaded(float k)
+        {
+            _heave = 1f;
+            _heaveSide = Random.value < 0.5f ? -1f : 1f;
+        }
+
+        // 더 못 들어 올림: 탑이 한 번 크게 휘청
+        void OnRefused(Food.Prey prey) => OnOverloaded(1f);
 
         void Rebuild()
         {
@@ -148,9 +163,12 @@ namespace DragonRecipe.Core
             float bank = m != null ? m.Bank : 0f;
             _lean = Mathf.Lerp(_lean, -bank * 0.25f, 4f * dt);
             float load = m != null ? Mathf.Clamp01(m.LoadFactor) : 0f;
+            float over = session.OverloadAmount;
+            _heave = Mathf.Max(0f, _heave - dt * 2.5f);
 
-            // 무거울수록, 위로 갈수록 크게 출렁임
-            float sway = 2f + 5f * load;
+            // 무거울수록, 위로 갈수록 크게 출렁임. 힘이 넘치면 위태롭게 휘청인다
+            float sway = 2f + 5f * load + 8f * over;
+            _lean += _heaveSide * _heave * (6f + 10f * over) * dt * 10f;
             foreach (var s in _stack)
             {
                 if (!s.t) continue;
