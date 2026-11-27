@@ -97,11 +97,31 @@ namespace DragonRecipe.Flight
         public float perfectBonus = 1.3f;
         public float spamPenalty = 0.35f;
 
+        [Header("체력")]
+        [Tooltip("비행을 시작할 때 체력. 0이 되면 추락(부상)으로 끝난다")]
+        public float maxHealth = 100f;
+        [Tooltip("땅에 닿을 때마다 받는 기본 피해")]
+        public float touchDamage = 2f;
+        [Tooltip("땅으로 파고드는 속도 1 m/s당 추가 피해. 가파르고 빠르게 닿을수록 커진다")]
+        public float impactDamagePerSpeed = 6f;
+        [Tooltip("땅으로 파고드는 속도가 이 이하면 추가 피해 없음 (m/s)")]
+        public float impactFreeSpeed = 1f;
+        [Tooltip("땅에서 미끄러지는 동안 초당 피해")]
+        public float skidDamagePerSecond = 3f;
+
         [Header("착지 / 충돌")]
-        [Tooltip("이 하강 속도 이하로 지면에 닿으면 안전 착지")]
+        [Tooltip("이 하강 속도 이하로 지면에 닿으면 끝나지 않고 미끄러진다 (넘으면 추락)")]
         public float safeLandingSink = 4.5f;
         [Tooltip("이 수평 속도 이하로 지면에 닿으면 안전 착지")]
         public float safeLandingSpeed = 17f;
+        [Tooltip("지면에 닿은 채 이 시간이 지나면 착지로 끝난다. 그 전에 날아오르면 계속 비행 (초)")]
+        public float touchdownGrace = 1f;
+        [Tooltip("지면에서 미끄러질 때 줄어드는 속도 (m/s²)")]
+        public float groundFriction = 6f;
+        [Tooltip("지면에 닿는 순간 잃는 속도 비율의 최대값 (닿는 각도가 groundImpactMaxAngle 이상일 때)")]
+        public float groundImpactLoss = 0.7f;
+        [Tooltip("이 각도(deg) 이상으로 내리꽂듯 닿으면 감속이 최대. 스치듯 얕게 닿을수록 덜 감속")]
+        public float groundImpactMaxAngle = 20f;
 
         public FlightParams Clone() => (FlightParams)MemberwiseClone();
     }

@@ -27,12 +27,28 @@ namespace DragonRecipe.Flight
 
         public event Action<FlapOutcome> Flapped;
         public event Action<LaunchPlan> Launched;
+        /// <summary>비행 중 지면에 살짝 닿아 미끄러지기 시작함 (아직 끝난 게 아님). (닿은 점, 지면 법선, 충격 세기 0~1)</summary>
+        public event Action<Vector3, Vector3, float> TouchedGround;
+        /// <summary>땅에 부딪혀 체력이 깎임 (피해량)</summary>
+        public event Action<float> Damaged;
+
+        /// <summary>지면에 닿아 미끄러지는 중</summary>
+        public bool IsSkidding => IsFlying && _groundTime > 0f;
+        /// <summary>미끄러진 시간 / 유예 시간 (0~1). 1이 되면 착지로 끝남</summary>
+        public float SkidProgress => Model == null ? 0f : Mathf.Clamp01(_groundTime / Mathf.Max(0.01f, Model.Params.touchdownGrace));
         /// <summary>(종류, 충돌 시 속도)</summary>
         public event Action<ImpactType, Vector3> Impacted;
 
         Rigidbody _rb;
         bool _flapRequested;
         Vector3 _runStart;
+        float _groundTime;
+        float _airTime;
+        const float GroundSkin = 0.15f;
+        /// <summary>이만큼 더 떠올라야 "지면에서 떨어짐"으로 본다 (닿았다 떨어졌다 깜빡임 방지)</summary>
+        const float LiftOffMargin = 0.3f;
+        /// <summary>떨어져 있던 시간이 이보다 짧으면 다시 닿아도 새 충격으로 치지 않는다</summary>
+        const float ReimpactDelay = 0.25f;
 
         void Awake()
         {
@@ -41,6 +57,8 @@ namespace DragonRecipe.Flight
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
             // SetStage가 먼저 불렸으면 (FlightCareBridge) 그 값을 유지
             if (Model == null) Model = new FlightModel(stage ? stage.flight : new FlightParams());
+            // [임시] 이미 만들어 둔 씬에도 흙 이펙트가 붙도록
+            if (!GetComponent<GroundImpactFx>()) gameObject.AddComponent<GroundImpactFx>().controller = this;
         }
 
         /// <param name="flightOverride">굶주림 등이 반영된 수치. null이면 단계 기본값</param>
@@ -75,6 +93,8 @@ namespace DragonRecipe.Flight
                 : RunUpModel.Evaluate(0f, 0f, 0f, Model.Params);
             Model.Launch(_rb.position, Model.Yaw, plan);
             RunUp = null;
+            _groundTime = 0f;
+            _airTime = ReimpactDelay;
             IsFlying = true;
             input?.ConsumeFlap();
             Launched?.Invoke(plan);
@@ -110,30 +130,85 @@ namespace DragonRecipe.Flight
 
             Vector3 delta = to - from;
             float dist = delta.magnitude;
+            bool touching = false;
+            Vector3 touchPoint = default, touchNormal = Vector3.up, touchVelocity = Model.Velocity;
             if (dist > 0.0001f &&
                 Physics.SphereCast(from, collisionRadius, delta / dist, out var hit, dist,
                     ~0, QueryTriggerInteraction.Ignore))
             {
                 Vector3 velocity = Model.Velocity;
-                Model.Position = hit.point + hit.normal * collisionRadius;
-                _rb.MovePosition(Model.Position);
-                IsFlying = false;
-                var type = FlightRules.ClassifyImpact(velocity, hit.normal, Model.Params);
-                if (type == ImpactType.Landed)
-                    _rb.MoveRotation(Quaternion.Euler(0, Model.Yaw, 0));
-                Impacted?.Invoke(type, velocity);
-                return;
+                if (!FlightRules.IsGround(hit.normal))
+                {
+                    // 나무·바위 옆면 같은 벽에 박음 → 바로 추락
+                    Model.Position = hit.point + hit.normal * collisionRadius;
+                    _rb.MovePosition(Model.Position);
+                    EndFlight(ImpactType.Crashed, velocity);
+                    return;
+                }
+
+                // 지면에 닿음: 지면 위에 올려놓고 미끄러진다 (세게 닿으면 체력이 크게 깎임)
+                to.y = Mathf.Max(to.y, hit.point.y + collisionRadius);
+                Model.Position = to;
+                touching = true;
+                touchPoint = hit.point;
+                touchNormal = hit.normal;
+                touchVelocity = velocity;
             }
 
             _rb.MovePosition(to);
             _rb.MoveRotation(Model.Rotation);
             UpdateAltitude();
 
+            // 지면에 붙어 있는 동안 유예 시간을 센다. 날갯짓 등으로 충분히 떠오르면 초기화
+            if (!touching && Altitude <= collisionRadius + GroundSkin)
+            {
+                touching = true;
+                touchPoint = Model.Position + Vector3.down * Altitude;
+            }
+            if (touching)
+            {
+                if (_groundTime <= 0f && _airTime >= ReimpactDelay)
+                {
+                    // 새로 닿음: 각도·속도만큼 피해 + 감속 + 흙 이펙트
+                    float damage = Model.TakeGroundImpact(touchVelocity, touchNormal);
+                    float strength = Model.Touchdown(touchVelocity, touchNormal);
+                    TouchedGround?.Invoke(touchPoint, touchNormal, strength);
+                    Damaged?.Invoke(damage);
+                }
+                _airTime = 0f;
+                Model.Skid(dt); // 미끄러지는 동안에도 조금씩 깎인다
+                if (Model.IsDead)
+                {
+                    EndFlight(ImpactType.Crashed, touchVelocity);
+                    return;
+                }
+                _groundTime += dt;
+                if (_groundTime >= Model.Params.touchdownGrace)
+                {
+                    EndFlight(ImpactType.Landed, Model.Velocity);
+                    return;
+                }
+            }
+            else
+            {
+                _airTime += dt;
+                if (Altitude > collisionRadius + GroundSkin + LiftOffMargin) _groundTime = 0f;
+            }
+
             if (to.y < killY)
             {
                 IsFlying = false;
                 Impacted?.Invoke(ImpactType.Crashed, Model.Velocity);
             }
+        }
+
+        void EndFlight(ImpactType type, Vector3 velocity)
+        {
+            IsFlying = false;
+            _groundTime = 0f;
+            if (type == ImpactType.Landed)
+                _rb.MoveRotation(Quaternion.Euler(0, Model.Yaw, 0));
+            Impacted?.Invoke(type, velocity);
         }
 
         /// <summary>둥지에서 절벽 끝 방향으로 달린다 (땅 위, 높이 고정)</summary>

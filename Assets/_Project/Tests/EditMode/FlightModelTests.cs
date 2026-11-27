@@ -273,5 +273,76 @@ namespace DragonRecipe.Tests
             float stumbleY = LaunchAndMeasure(1f, 1f, LaunchGrade.Stumble, out _);
             Assert.LessOrEqual(stumbleY, 30.01f);
         }
+
+        // ── 지면에 살짝 닿기 ──
+
+        [Test]
+        public void GroundAndWall_AreTellApart()
+        {
+            Assert.IsTrue(FlightRules.IsGround(Vector3.up));
+            Assert.IsFalse(FlightRules.IsGround(Vector3.back));
+        }
+
+        [Test]
+        public void ShallowSkim_CostsLittleHealth()
+        {
+            var m = NewHatchling(speed: 30f);
+            float damage = m.TakeGroundImpact(new Vector3(0, -1f, 30f), Vector3.up); // 빠르지만 거의 수평
+            Assert.AreEqual(m.Params.touchDamage, damage, 1e-4f);
+            Assert.Greater(m.Health, m.Params.maxHealth * 0.95f);
+        }
+
+        [Test]
+        public void SteepFastImpact_CostsMuchMore_AndCanKill()
+        {
+            var p = new FlightParams();
+            float shallow = FlightRules.GroundImpactDamage(new Vector3(0, -2f, 20f), Vector3.up, p);
+            float steep = FlightRules.GroundImpactDamage(new Vector3(0, -10f, 20f), Vector3.up, p);
+            Assert.Greater(steep, shallow * 5f, "가파르게 부딪히면 훨씬 크게 깎임");
+
+            var m = NewHatchling(speed: 35f);
+            m.TakeGroundImpact(new Vector3(0, -25f, 25f), Vector3.up); // 거의 내리꽂음
+            Assert.IsTrue(m.IsDead);
+        }
+
+        [Test]
+        public void Skidding_SlowlyDrainsHealth()
+        {
+            var m = NewHatchling();
+            m.Skid(1f);
+            Assert.AreEqual(m.Params.maxHealth - m.Params.skidDamagePerSecond, m.Health, 1e-4f);
+        }
+
+        [Test]
+        public void Skid_StopsSinking_AndSlowsDown()
+        {
+            var m = NewHatchling(speed: 20f);
+            m.Pitch = -10f;
+            m.VerticalSpeed = -3f;
+            m.Skid(0.5f);
+            Assert.AreEqual(0f, m.VerticalSpeed);
+            Assert.AreEqual(0f, m.Pitch);
+            Assert.Less(m.Speed, 20f);
+        }
+
+        [Test]
+        public void TouchdownAngle_SteeperLosesMoreSpeed()
+        {
+            var shallow = NewHatchling(speed: 20f);
+            var steep = NewHatchling(speed: 20f);
+            float sShallow = shallow.Touchdown(new Vector3(0, -0.5f, 20f), Vector3.up);
+            float sSteep = steep.Touchdown(new Vector3(0, -4f, 12f), Vector3.up);
+
+            Assert.Greater(shallow.Speed, steep.Speed, "가파르게 닿을수록 더 많이 감속");
+            Assert.Less(sShallow, sSteep, "가파를수록 충격이 큼");
+            Assert.Greater(shallow.Speed, 18f, "스치듯 닿으면 거의 그대로");
+        }
+
+        [Test]
+        public void ImpactAngle_IsZeroWhenMovingAway()
+        {
+            Assert.AreEqual(0f, FlightRules.ImpactAngle(new Vector3(0, 2f, 10f), Vector3.up));
+            Assert.AreEqual(90f, FlightRules.ImpactAngle(Vector3.down * 5f, Vector3.up), 1e-3f);
+        }
     }
 }

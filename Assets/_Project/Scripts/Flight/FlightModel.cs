@@ -34,6 +34,7 @@ namespace DragonRecipe.Flight
         /// <summary>양력 부족/날갯짓으로 생기는 추가 수직 속도 (m/s)</summary>
         public float VerticalSpeed;
         public float Stamina;
+        public float Health;
         public float Time { get; private set; }
         public int PerfectFlapCount { get; private set; }
 
@@ -52,6 +53,7 @@ namespace DragonRecipe.Flight
         public Vector3 Velocity => Forward * Speed + Vector3.up * VerticalSpeed;
         public Quaternion Rotation => Quaternion.Euler(-Pitch, Yaw, -Bank);
         public bool IsStalling => Speed < Params.stallSpeed;
+        public bool IsDead => Health <= 0f;
         public float TimeSinceLastFlap => Time - _lastFlapTime;
 
         public void Reset(Vector3 position, float yaw, float speed)
@@ -63,6 +65,7 @@ namespace DragonRecipe.Flight
             Speed = speed;
             VerticalSpeed = 0f;
             Stamina = Params.maxStamina;
+            Health = Params.maxHealth;
             Time = 0f;
             PerfectFlapCount = 0;
             _lastFlapTime = float.NegativeInfinity;
@@ -131,6 +134,31 @@ namespace DragonRecipe.Flight
             Speed = Mathf.Min(Speed + Params.flapThrust * eff, Params.maxSpeed);
             if (outcome == FlapOutcome.Perfect) PerfectFlapCount++;
             return outcome;
+        }
+
+        /// <summary>지면에 닿는 순간의 피해. 받은 피해량을 돌려준다</summary>
+        public float TakeGroundImpact(Vector3 velocity, Vector3 surfaceNormal)
+        {
+            float damage = FlightRules.GroundImpactDamage(velocity, surfaceNormal, Params);
+            Health = Mathf.Max(0f, Health - damage);
+            return damage;
+        }
+
+        /// <summary>지면에 닿는 순간: 닿는 각도가 클수록 속도를 크게 잃는다. 충격 세기(0~1)를 돌려준다</summary>
+        public float Touchdown(Vector3 velocity, Vector3 surfaceNormal)
+        {
+            float angle = FlightRules.ImpactAngle(velocity, surfaceNormal);
+            Speed = Mathf.Max(Params.minSpeed, Speed * (1f - FlightRules.TouchdownSpeedLoss(angle, Params)));
+            return FlightRules.TouchdownStrength(angle, Params);
+        }
+
+        /// <summary>지면에 닿아 미끄러지는 중: 파고들지 않게 하고 마찰로 감속</summary>
+        public void Skid(float dt)
+        {
+            if (VerticalSpeed < 0f) VerticalSpeed = 0f;
+            if (Pitch < 0f) Pitch = 0f;
+            Speed = Mathf.Max(Params.minSpeed, Speed - Params.groundFriction * dt);
+            Health = Mathf.Max(0f, Health - Params.skidDamagePerSecond * dt);
         }
 
         /// <param name="stick">x = 선회, y = 기수 (+ 위)</param>

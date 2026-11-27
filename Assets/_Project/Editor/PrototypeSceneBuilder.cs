@@ -595,6 +595,7 @@ namespace DragonRecipe.EditorTools
             sphere.radius = 1.6f;
             snatch = snatchGo.AddComponent<SnatchZone>();
 
+            root.AddComponent<GroundImpactFx>().controller = ctrl; // [임시] 지면에 닿을 때 흙 튐
             var visual = root.AddComponent<DragonVisual>();
             visual.controller = ctrl;
             visual.leftWing = wingL;

@@ -147,7 +147,6 @@ namespace DragonRecipe.Core
         {
             switch (outcome)
             {
-                case FlapOutcome.Perfect: Feedback?.Invoke("완벽한 날갯짓!", Good); break;
                 case FlapOutcome.Weak: Feedback?.Invoke("너무 서둘러요", Bad); break;
                 case FlapOutcome.Failed: Feedback?.Invoke("지쳤어요… 활공해서 쉬세요", Bad); break;
             }
