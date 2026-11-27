@@ -4,39 +4,58 @@ using UnityEngine;
 namespace DragonRecipe.Core
 {
     /// <summary>
-    /// 발톱에 매단 먹이를 드래곤 아래에 매달아 보여 준다.
-    /// 무거울수록 크게 흔들리고, 버둥거리는 먹이는 홱홱 몸부림친다.
+    /// 잡은 먹이를 드래곤 등 위에 차곡차곡 쌓아 보여 준다.
+    /// 높이 쌓일수록, 무거울수록 탑이 크게 출렁이고, 버둥거리는 먹이는 홱홱 몸부림친다.
     /// </summary>
     public class CarryVisual : MonoBehaviour
     {
         public FlightSession session;
-        [Tooltip("먹이를 매다는 위치 (비우면 낚아채기 영역)")]
+        [Tooltip("먹이를 쌓는 곳 (비우면 드래곤의 'Model', 없으면 드래곤)")]
         public Transform anchor;
+        [Tooltip("드래곤 등 위에 쌓기 (끄면 anchor 아래에 매단다)")]
+        public bool stackOnBack = true;
+        [Tooltip("등 위 첫 먹이가 놓이는 위치 (anchor 기준)")]
+        public Vector3 backOffset = new Vector3(0f, 0.42f, -0.15f);
         public Material material;
-        [Tooltip("매달린 먹이 크기 배율 (원래 먹이 크기 기준)")]
+        [Tooltip("쌓인 먹이 크기 배율 (원래 먹이 크기 기준)")]
         public float scale = 0.6f;
-        public float spacing = 0.55f;
+        [Tooltip("먹이 사이 틈 (m)")]
+        public float gap = 0.03f;
 
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly int ColorId = Shader.PropertyToID("_Color");
         static readonly Color RareColor = new Color(1f, 0.82f, 0.2f);
 
-        class Hung
+        class Stacked
         {
             public Transform t;
+            public Vector3 basePos;
+            public float yaw;
+            public float height; // 탑에서 몇 번째 높이인지 (0 = 맨 아래)
             public bool struggles;
             public float phase;
         }
 
-        readonly List<Hung> _hung = new List<Hung>();
+        readonly List<Stacked> _stack = new List<Stacked>();
         Transform _root;
         float _jolt; // 1 → 0
         float _eatPulse;
+        float _lean; // 선회에 따라 탑이 바깥으로 기우는 정도 (deg)
 
         void Awake()
         {
-            if (!anchor && session && session.snatchZone) anchor = session.snatchZone.transform;
             if (!material && session && session.spawner) material = session.spawner.preyMaterial;
+        }
+
+        Transform ResolveAnchor()
+        {
+            if (stackOnBack && session && session.dragon)
+            {
+                var model = session.dragon.transform.Find("Model");
+                return model ? model : session.dragon.transform;
+            }
+            if (anchor) return anchor;
+            return session && session.snatchZone ? session.snatchZone.transform : null;
         }
 
         void OnEnable()
@@ -64,13 +83,16 @@ namespace DragonRecipe.Core
                 _root.gameObject.SetActive(false);
                 Destroy(_root.gameObject);
             }
-            _hung.Clear();
-            if (!session || !anchor) return;
+            _stack.Clear();
+            var at = ResolveAnchor();
+            if (!session || !at) return;
 
             _root = new GameObject("CarriedFood").transform;
-            _root.SetParent(anchor, false);
+            _root.SetParent(at, false);
+            _root.localPosition = stackOnBack ? backOffset : Vector3.zero;
+
             int i = 0;
-            int count = session.Result.CarriedCount;
+            float y = 0f;
             foreach (var c in session.Result.caught)
             {
                 if (!c.Carried || !c.food) continue;
@@ -78,9 +100,22 @@ namespace DragonRecipe.Core
                 DestroyImmediate(go.GetComponent<Collider>()); // 드래곤 SphereCast / 낚아채기에 걸리지 않게
                 go.name = c.food.id;
                 go.transform.SetParent(_root, false);
-                float x = (i - (count - 1) * 0.5f) * spacing;
-                go.transform.localPosition = new Vector3(x, -c.food.bodySize.y * scale * 0.5f, 0f);
-                go.transform.localScale = c.food.bodySize * scale * (c.rare ? Food.Prey.RareScale : 1f);
+                var size = c.food.bodySize * scale * (c.rare ? Food.Prey.RareScale : 1f);
+                go.transform.localScale = size;
+
+                // 등 위: 아래에서부터 차곡차곡. 매달기: 옆으로 나란히 늘어뜨림
+                Vector3 pos;
+                if (stackOnBack)
+                {
+                    pos = new Vector3(Mathf.Sin(i * 2.4f) * 0.04f, y + size.y * 0.5f, Mathf.Cos(i * 1.7f) * 0.04f);
+                    y += size.y + gap;
+                }
+                else
+                {
+                    pos = new Vector3(i * 0.55f, -size.y * 0.5f, 0f);
+                }
+                go.transform.localPosition = pos;
+
                 var r = go.GetComponent<Renderer>();
                 if (material) r.sharedMaterial = material;
                 var block = new MaterialPropertyBlock();
@@ -88,7 +123,16 @@ namespace DragonRecipe.Core
                 block.SetColor(BaseColorId, color);
                 block.SetColor(ColorId, color);
                 r.SetPropertyBlock(block);
-                _hung.Add(new Hung { t = go.transform, struggles = c.food.struggles, phase = i * 1.3f });
+
+                _stack.Add(new Stacked
+                {
+                    t = go.transform,
+                    basePos = pos,
+                    yaw = Mathf.Sin(i * 3.1f) * 25f, // 아무렇게나 얹은 듯 살짝 틀어짐
+                    height = i,
+                    struggles = c.food.struggles,
+                    phase = i * 1.3f,
+                });
                 i++;
             }
         }
@@ -97,21 +141,38 @@ namespace DragonRecipe.Core
         {
             if (!_root || !session || !session.dragon) return;
             var m = session.dragon.Model;
-            _jolt = Mathf.Max(0f, _jolt - Time.deltaTime * 3f);
+            float dt = Time.deltaTime;
+            _jolt = Mathf.Max(0f, _jolt - dt * 3f);
 
-            // 무거울수록 축 늘어져 크게 흔들림
-            float sway = 6f + 14f * Mathf.Clamp01(m.LoadFactor);
-            float bank = m.Bank;
-            foreach (var h in _hung)
+            // 선회하면 탑이 바깥쪽으로 늦게 따라 기운다
+            float bank = m != null ? m.Bank : 0f;
+            _lean = Mathf.Lerp(_lean, -bank * 0.25f, 4f * dt);
+            float load = m != null ? Mathf.Clamp01(m.LoadFactor) : 0f;
+
+            // 무거울수록, 위로 갈수록 크게 출렁임
+            float sway = 2f + 5f * load;
+            foreach (var s in _stack)
             {
-                if (!h.t) continue;
-                float wobble = Mathf.Sin(Time.time * 3f + h.phase) * sway;
-                float kick = h.struggles ? Mathf.Sin(Time.time * 30f + h.phase) * 35f * _jolt + Mathf.Sin(Time.time * 9f + h.phase) * 6f : 0f;
-                h.t.localRotation = Quaternion.Euler(wobble * 0.5f, kick, bank * 0.4f + wobble);
+                if (!s.t) continue;
+                float h = s.height + 1f;
+                float wobble = Mathf.Sin(Time.time * 3f + s.phase) * sway * h * 0.5f;
+                float kick = s.struggles ? Mathf.Sin(Time.time * 30f + s.phase) * 35f * _jolt + Mathf.Sin(Time.time * 9f + s.phase) * 6f : 0f;
+                if (stackOnBack)
+                {
+                    float roll = _lean * h * 0.5f + wobble;
+                    // 기운 만큼 옆으로 밀려 탑이 휘어 보이게
+                    float shift = Mathf.Sin(roll * Mathf.Deg2Rad) * s.basePos.y;
+                    s.t.localPosition = s.basePos + new Vector3(-shift, 0f, 0f);
+                    s.t.localRotation = Quaternion.Euler(wobble * 0.4f, s.yaw + kick, roll);
+                }
+                else
+                {
+                    s.t.localRotation = Quaternion.Euler(wobble * 0.5f, kick, bank * 0.4f + wobble);
+                }
             }
 
-            // 먹는 중: 맨 앞 먹이가 쪼그라든다
-            _eatPulse = session.dragon.IsEating ? _eatPulse + Time.deltaTime * 12f : 0f;
+            // 먹는 중: 탑이 꿈틀꿈틀
+            _eatPulse = session.dragon.IsEating ? _eatPulse + dt * 12f : 0f;
             _root.localScale = Vector3.one * (1f + Mathf.Sin(_eatPulse) * 0.05f);
         }
     }

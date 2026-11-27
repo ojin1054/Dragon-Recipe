@@ -127,7 +127,10 @@ namespace DragonRecipe.Tests
             Assert.Greater(session.dragon.Model.Payload, 0f, "매단 먹이 무게가 비행에 반영돼야 함");
             var carry = Object.FindFirstObjectByType<CarryVisual>();
             Assert.IsNotNull(carry);
-            Assert.AreEqual(2, session.snatchZone.transform.Find("CarriedFood").childCount, "매달린 먹이가 안 보임");
+            var stack = session.dragon.transform.Find("Model/CarriedFood");
+            Assert.IsNotNull(stack, "드래곤 등 위에 먹이 탑이 없음");
+            Assert.AreEqual(2, stack.childCount, "등 위에 쌓인 먹이가 안 보임");
+            Assert.Greater(stack.GetChild(1).localPosition.y, stack.GetChild(0).localPosition.y, "먹이가 위로 쌓이지 않음");
 
             float stamina = session.dragon.Model.Stamina;
             float payload = session.dragon.Model.Payload;
