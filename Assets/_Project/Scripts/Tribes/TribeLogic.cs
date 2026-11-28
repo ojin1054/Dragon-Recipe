@@ -292,6 +292,9 @@ namespace DragonRecipe.Tribes
         /// <summary>방어전 무리 크기 (0 = 첫 무리)</summary>
         public static int RaidSize(int wave, TribeSettings s) => Mathf.Max(1, s.raidBaseSize + wave * s.raidGrowth);
 
+        /// <summary>전쟁 맵: 무리마다 병사 수 (훨씬 많다)</summary>
+        public static int WarRaidSize(int wave, TribeSettings s) => Mathf.Max(1, s.warBaseSize + wave * s.warGrowth);
+
         static void ResolveWar(TribeState state, TribeSettings s, Func<float> rand, TribeReport report)
         {
             var war = state.war;

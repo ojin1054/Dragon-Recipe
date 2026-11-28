@@ -62,6 +62,18 @@ namespace DragonRecipe.Tests
         }
 
         [Test]
+        public void Griffins_SuspectBeforeTheyChase()
+        {
+            var p = new HostileParams();
+            Vector3 home = Vector3.zero;
+            var justOutside = new Vector3(0, 0, p.monsterAggroRadius + 5f);
+            Assert.IsFalse(HostileRules.ShouldChase(home, home, justOutside, p));
+            Assert.IsTrue(HostileRules.Suspects(home, home, justOutside, p), "쫓아올 거리 바로 밖에서는 의심한다");
+            var far = new Vector3(0, 0, p.monsterAggroRadius * p.monsterSuspectScale + 5f);
+            Assert.IsFalse(HostileRules.Suspects(home, home, far, p), "멀면 모른다");
+        }
+
+        [Test]
         public void Hunters_FrightenedOnlyByLowCloseDragon()
         {
             var p = new HostileParams();

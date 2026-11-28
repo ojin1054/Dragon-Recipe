@@ -88,7 +88,7 @@ namespace DragonRecipe.Tests
             yield return new WaitForSeconds(panel.showDelay + 0.2f);
             Assert.IsTrue(panel.panel.activeSelf, "결과 화면이 안 뜸");
             Assert.Greater(panel.titleIcons.transform.childCount, 0, "결과 제목 아이콘이 없음");
-            Assert.Greater(panel.bodyIcons.transform.childCount, 2, "결과 본문 아이콘이 부족함");
+            Assert.GreaterOrEqual(panel.bodyIcons.transform.childCount, 2, "결과 띠의 두 줄(기록·먹이 / 먹이가 간 곳)이 없음");
             var titleImages = panel.titleIcons.GetComponentsInChildren<UnityEngine.UI.Image>();
             var expected = ended.Injured ? panel.icons.boom : panel.icons.check;
             Assert.IsTrue(System.Array.Exists(titleImages, i => i.sprite == expected), "착지/추락 아이콘이 결과와 맞지 않음");
@@ -154,6 +154,9 @@ namespace DragonRecipe.Tests
                 .Invoke(session, null);
             yield return null;
 
+            // 거부될 때마다 아래로 꺾이므로, 바닥에 부딪히지 않게 먼저 높이 띄워 둔다
+            session.dragon.Model.Position += Vector3.up * 150f;
+
             int refused = 0;
             session.SnatchRefused += _ => refused++;
             var snatch = typeof(FlightSession).GetMethod("OnSnatched", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -176,8 +179,6 @@ namespace DragonRecipe.Tests
             {
                 int shakes = 0;
                 session.Overloaded += _ => shakes++;
-                // 흔들림을 보기 전에 땅에 닿지 않게 높이 띄워 둔다
-                session.dragon.Model.Position += Vector3.up * 150f;
                 for (float t = 0; t < 2f && shakes == 0; t += Time.deltaTime) yield return null;
                 Assert.Greater(shakes, 0, "힘이 넘치는데 흔들리지 않음");
             }

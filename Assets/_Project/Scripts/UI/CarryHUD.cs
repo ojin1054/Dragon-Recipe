@@ -167,7 +167,7 @@ namespace DragonRecipe.UI
             carryIcons.Clear();
             if (session.Result.CarriedCount == 0) return;
 
-            var row = carryIcons.AddRow().Icon(icons.claw, 0.9f).Gap(12f);
+            var row = carryIcons.AddRow();
             foreach (var c in session.Result.caught)
             {
                 if (!c.Carried || !c.food) continue;

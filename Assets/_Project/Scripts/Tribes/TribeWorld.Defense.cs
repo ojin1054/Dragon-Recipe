@@ -28,7 +28,11 @@ namespace DragonRecipe.Tribes
         public int DefenseLeft { get; private set; }
         public int DefenseMax => Settings.villageDefense;
         /// <summary>아직 오지 않은 적 무리 수</summary>
-        public int WavesLeft => Mathf.Max(0, Settings.raidWaves - _wave);
+        public int WavesLeft => Mathf.Max(0, WaveCount - _wave);
+        /// <summary>비행 한 번에 오는 적 무리 수 (전쟁 맵은 더 많다)</summary>
+        int WaveCount => _warMap ? Settings.warWaves : Settings.raidWaves;
+        /// <summary>침입자 행군 속도</summary>
+        float RaidSpeed => _warMap ? Settings.warRaidSpeed : Settings.raidSpeed;
         /// <summary>쓰러지지 않은 침입자 수</summary>
         public int RaidersAlive
         {
@@ -47,8 +51,9 @@ namespace DragonRecipe.Tribes
         void ResetDefense()
         {
             _wave = 0;
-            _raidTimer = Settings.raidFirstDelay;
+            _raidTimer = _warMap ? Settings.warFirstDelay : Settings.raidFirstDelay;
             DefenseLeft = Settings.villageDefense;
+            _reachedSinceBreach = 0;
         }
 
         // ───────── 출발 자리 ─────────
@@ -59,7 +64,8 @@ namespace DragonRecipe.Tribes
             if (!session || !session.dragon) return;
             var st = State;
             Transform nest = _homeNest, edge = _homeEdge;
-            if (st != null && st.war.status == WarStatus.Joined && _villages[(int)st.war.joined] != null)
+            // 전쟁 맵은 씬의 진영 절벽(_homeNest)에서 그대로 출발
+            if (!_warMap && st != null && st.war.status == WarStatus.Joined && _villages[(int)st.war.joined] != null)
             {
                 EnsureTower(st.war.joined, st.war.Enemy(st.war.joined));
                 nest = _towerNest;
@@ -161,7 +167,7 @@ namespace DragonRecipe.Tribes
                 if (!m || !m.IsRaider) continue;
                 if (m.pendingBreach)
                 {
-                    if (joined) Breach(war.joined);
+                    if (joined) RaiderReached(war.joined);
                     Destroy(m.gameObject);
                     _members.RemoveAt(i);
                 }
@@ -173,12 +179,13 @@ namespace DragonRecipe.Tribes
             }
 
             if (!joined || !flying) return;
-            if (_wave >= Settings.raidWaves) return;
+            if (_wave >= WaveCount) return;
             _raidTimer -= dt;
             if (_raidTimer > 0f) return;
-            SpawnWave(war.joined, war.Enemy(war.joined), _wave);
+            if (_warMap) SpawnWarWave(war.joined, war.Enemy(war.joined), _wave);
+            else SpawnWave(war.joined, war.Enemy(war.joined), _wave);
             _wave++;
-            _raidTimer = Settings.raidInterval;
+            _raidTimer = _warMap ? Settings.warInterval : Settings.raidInterval;
         }
 
         void SpawnWave(Tribe ally, Tribe enemy, int wave)
@@ -199,13 +206,7 @@ namespace DragonRecipe.Tribes
             {
                 float lateral = (i - (n - 1) * 0.5f) * 2.2f + Random.Range(-0.6f, 0.6f);
                 var m = Spawn(e, from + side * lateral - dir * Random.Range(0f, 4f), true, false);
-                if (!m) continue;
-                m.IsRaider = true;
-                m.home = a.center; // 목표 = 편든 쪽 마을 가운데
-                m.reload = Random.Range(1f, 3f);
-                // 횃불: 멀리서도 몰려오는 게 보이게
-                var torch = Part(PrimitiveType.Cube, "Torch", m.transform, new Vector3(-0.35f, 2.3f, 0.1f), new Vector3(0.22f, 0.35f, 0.22f), new Color(1f, 0.55f, 0.1f));
-                torch.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                if (m) MakeRaider(m, a.center); // 목표 = 편든 쪽 마을 가운데
             }
         }
 
@@ -246,7 +247,7 @@ namespace DragonRecipe.Tribes
                 m.aim = 0f;
             }
 
-            pos += to.normalized * s.raidSpeed * speedScale * dt;
+            pos += to.normalized * RaidSpeed * speedScale * dt;
             float bob = Mathf.Abs(Mathf.Sin(Time.time * 7f + m.phase)) * 0.12f;
             var rot = face.sqrMagnitude > 0.001f ? Quaternion.Slerp(m.transform.rotation, Quaternion.LookRotation(face), 6f * dt) : m.transform.rotation;
             SetPose(m, pos, rot, bob);
@@ -297,7 +298,7 @@ namespace DragonRecipe.Tribes
             Vector3 aimAt = best.transform.position + Vector3.up * 1f;
             Vector3 vel = best.home - best.transform.position;
             vel.y = 0f;
-            vel = vel.sqrMagnitude > 0.01f ? vel.normalized * Settings.raidSpeed : Vector3.zero;
+            vel = vel.sqrMagnitude > 0.01f ? vel.normalized * RaidSpeed : Vector3.zero;
             m.aimOffset = aimAt - pos;
             AimAndFire(m, dt, aimAt, vel, false, best.Tribe);
             face = new Vector3(m.aimOffset.x, 0f, m.aimOffset.z);

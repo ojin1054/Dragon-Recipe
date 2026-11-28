@@ -26,8 +26,23 @@ namespace DragonRecipe.CameraRig
         public float boostFov = 8f;
 
         Camera _cam;
+        Vector3 _rigPos;
+        Quaternion _rigRot = Quaternion.identity;
+        bool _hasRig;
+        float _fov;
 
-        void Awake() => _cam = GetComponent<Camera>();
+        /// <summary>흔들림 (카메라 기준 로컬 위치). <see cref="SpeedJuice"/>가 매 프레임 정한다</summary>
+        public Vector3 ShakeOffset { get; set; }
+        /// <summary>흔들림 기울기 (deg)</summary>
+        public float ShakeRoll { get; set; }
+        /// <summary>시야각에 더하는 값 (속도 단계를 넘는 순간의 펀치 등)</summary>
+        public float ExtraFov { get; set; }
+
+        void Awake()
+        {
+            _cam = GetComponent<Camera>();
+            if (!GetComponent<SpeedJuice>()) gameObject.AddComponent<SpeedJuice>();
+        }
 
         void Start() => Snap();
 
@@ -35,6 +50,9 @@ namespace DragonRecipe.CameraRig
         {
             if (!target) return;
             ComputeGoal(out var pos, out var rot, 0f);
+            _rigPos = pos;
+            _rigRot = rot;
+            _hasRig = true;
             transform.SetPositionAndRotation(pos, rot);
         }
 
@@ -47,10 +65,19 @@ namespace DragonRecipe.CameraRig
             ComputeGoal(out var pos, out var rot, t);
             float k = 1f - Mathf.Exp(-positionSmoothing * Time.deltaTime);
             float kr = 1f - Mathf.Exp(-rotationSmoothing * Time.deltaTime);
-            transform.position = Vector3.Lerp(transform.position, pos, k);
-            transform.rotation = Quaternion.Slerp(transform.rotation, rot, kr);
+            if (!_hasRig)
+            {
+                _rigPos = transform.position;
+                _rigRot = transform.rotation;
+                _hasRig = true;
+            }
+            // 흔들림은 따라가기 계산과 따로 더한다 (흔들림이 다음 프레임 위치에 쌓이지 않게)
+            _rigPos = Vector3.Lerp(_rigPos, pos, k);
+            _rigRot = Quaternion.Slerp(_rigRot, rot, kr);
+            transform.SetPositionAndRotation(_rigPos + _rigRot * ShakeOffset, _rigRot * Quaternion.Euler(0f, 0f, ShakeRoll));
             float boost = target.IsFlying && target.Model.IsBoosting ? boostFov : 0f;
-            _cam.fieldOfView = Mathf.Lerp(_cam.fieldOfView, Mathf.Lerp(baseFov, maxFov, t) + boost, k);
+            _fov = Mathf.Lerp(_fov <= 0f ? _cam.fieldOfView : _fov, Mathf.Lerp(baseFov, maxFov, t) + boost, k);
+            _cam.fieldOfView = _fov + ExtraFov;
         }
 
         void ComputeGoal(out Vector3 pos, out Quaternion rot, float speedT)

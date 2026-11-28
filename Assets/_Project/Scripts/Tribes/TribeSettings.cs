@@ -158,6 +158,22 @@ namespace DragonRecipe.Tribes
         public float allyReloadScale = 2.2f;
         [Tooltip("망루 높이 (참전하면 여기서 이륙)")]
         public float watchtowerHeight = 16f;
+        [Header("전쟁 맵 (참전 중 비행 전용 전장)")]
+        [Tooltip("비행 한 번에 몰려오는 적 무리 수")]
+        public int warWaves = 5;
+        [Tooltip("이륙 뒤 첫 무리가 출발할 때까지 (초)")]
+        public float warFirstDelay = 3f;
+        public float warInterval = 16f;
+        [Tooltip("첫 무리 병사 수, 무리마다 늘어나는 수")]
+        public int warBaseSize = 10;
+        public int warGrowth = 4;
+        [Tooltip("한 줄에 서는 병사 수 (넘치면 뒷줄로)")]
+        public int warRankWidth = 10;
+        public float warRaidSpeed = 4.5f;
+        [Tooltip("이만큼 진영에 닿아야 한 번 뚫린 것으로 센다 (방어 칸·승률·호감도)")]
+        public int warRaidersPerBreach = 5;
+        [Tooltip("적 진영 가운데에서 이만큼 앞(편든 쪽으로)에서 출발한다")]
+        public float warSpawnAhead = 25f;
         [Tooltip("이기면 편든 쪽이 오르는 호감도")]
         public float winGain = 25f;
         [Tooltip("지면 편든 쪽이 잃는 호감도")]

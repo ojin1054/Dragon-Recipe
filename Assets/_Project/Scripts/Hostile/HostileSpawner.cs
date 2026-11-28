@@ -11,7 +11,7 @@ namespace DragonRecipe.Hostile
     /// [임시] 비행 구역에 드래곤을 공격하는 적을 배치한다.
     /// - 사냥꾼 무리: 땅에 모여 있다가 드래곤이 다가오면 시위를 당겨(활이 들리고 화살촉이 빨개짐) 앞질러 쏜다.
     ///   드래곤이 낮게 덮치면 흩어져 달아난다.
-    /// - 날개 몬스터: 자기 자리 상공을 맴돌다 드래곤이 다가오면 눈이 빨개지며 쫓아와 문다. 물고 나면 잠깐 물러난다.
+    /// - 그리핀: 자기 자리 상공을 맴돌다 드래곤이 다가오면 눈이 빨개지며 쫓아와 문다. 물고 나면 잠깐 물러난다.
     /// 프리미티브로만 만든 자리표시용이고 콜라이더가 없어 드래곤 충돌 판정에 걸리지 않는다.
     /// 씬에 없으면 비행 씬(FlightSession)이 열릴 때 스스로 붙는다.
     /// </summary>
@@ -91,6 +91,7 @@ namespace DragonRecipe.Hostile
         static void Attach()
         {
             if (FindAnyObjectByType<HostileSpawner>()) return;
+            if (FindAnyObjectByType<DragonRecipe.Tribes.WarMap>()) return; // 전쟁 맵은 종족 군대만
             var session = FindAnyObjectByType<FlightSession>();
             if (!session) return;
             var go = new GameObject("Hostiles");
@@ -311,7 +312,7 @@ namespace DragonRecipe.Hostile
             }
         }
 
-        // ───────── 날개 몬스터 ─────────
+        // ───────── 그리핀 ─────────
 
         void UpdateMonster(Monster m, float dt, bool active, DragonFlightController dragon, Vector3 target, float hitRadius)
         {
@@ -441,34 +442,93 @@ namespace DragonRecipe.Hostile
             return new Hunter { root = root, bow = bow, tip = tip.GetComponent<Renderer>(), home = root.position, groundY = groundY };
         }
 
+        /// <summary>그리핀: 독수리 머리·날개·앞발톱에 사자 몸통·꼬리. 앞(+z)을 보고 난다</summary>
         Monster MakeMonster(Vector3 home)
         {
-            var root = new GameObject("WingedMonster").transform;
+            var root = new GameObject("Griffin").transform;
             root.SetParent(transform, false);
             root.position = home;
-            var body = new Color(0.28f, 0.16f, 0.32f);
-            Part(PrimitiveType.Sphere, "Body", root, Vector3.zero, new Vector3(1.2f, 1f, 1.6f), body);
-            Part(PrimitiveType.Sphere, "Head", root, new Vector3(0, 0.25f, 0.95f), Vector3.one * 0.8f, body);
+            var fur = new Color(0.78f, 0.58f, 0.28f);      // 사자 몸통
+            var furDark = new Color(0.55f, 0.38f, 0.18f);
+            var feather = new Color(0.95f, 0.93f, 0.86f);  // 독수리 머리·가슴 깃
+            var beak = new Color(0.98f, 0.76f, 0.18f);
+            var wingColor = new Color(0.5f, 0.33f, 0.17f);
+            var wingTip = new Color(0.9f, 0.86f, 0.74f);
+
+            // 사자 몸통과 뒷다리, 꼬리
+            Part(PrimitiveType.Sphere, "Body", root, new Vector3(0, 0, -0.1f), new Vector3(1.2f, 1.05f, 2f), fur);
+            Part(PrimitiveType.Sphere, "Haunch", root, new Vector3(0, -0.05f, -0.75f), new Vector3(1.15f, 1f, 1f), furDark);
+            foreach (int side in new[] { -1, 1 })
+                Part(PrimitiveType.Capsule, "HindLeg", root, new Vector3(side * 0.38f, -0.55f, -0.85f), new Vector3(0.28f, 0.42f, 0.28f), furDark)
+                    .transform.localRotation = Quaternion.Euler(55f, 0f, 0f);
+            Part(PrimitiveType.Cube, "Tail", root, new Vector3(0, 0.1f, -1.55f), new Vector3(0.12f, 0.12f, 1f), furDark)
+                .transform.localRotation = Quaternion.Euler(-18f, 0f, 0f);
+            Part(PrimitiveType.Sphere, "TailTuft", root, new Vector3(0, 0.28f, -2.05f), Vector3.one * 0.32f, new Color(0.35f, 0.22f, 0.1f));
+
+            // 독수리 가슴 깃·머리·부리
+            Part(PrimitiveType.Sphere, "Chest", root, new Vector3(0, 0.1f, 0.65f), new Vector3(1.05f, 1.05f, 1f), feather);
+            Part(PrimitiveType.Sphere, "Head", root, new Vector3(0, 0.5f, 1.2f), Vector3.one * 0.72f, feather);
+            Part(PrimitiveType.Cube, "Beak", root, new Vector3(0, 0.42f, 1.62f), new Vector3(0.24f, 0.2f, 0.4f), beak);
+            Part(PrimitiveType.Cube, "BeakHook", root, new Vector3(0, 0.3f, 1.8f), new Vector3(0.16f, 0.22f, 0.12f), beak)
+                .transform.localRotation = Quaternion.Euler(25f, 0f, 0f);
+            foreach (int side in new[] { -1, 1 })
+                Part(PrimitiveType.Cube, "EarTuft", root, new Vector3(side * 0.22f, 0.9f, 1.02f), new Vector3(0.1f, 0.3f, 0.12f), wingColor)
+                    .transform.localRotation = Quaternion.Euler(-20f, 0f, side * -18f);
             var eyes = new[]
             {
-                Part(PrimitiveType.Sphere, "EyeL", root, new Vector3(-0.2f, 0.4f, 1.3f), Vector3.one * 0.2f, EyeIdle).GetComponent<Renderer>(),
-                Part(PrimitiveType.Sphere, "EyeR", root, new Vector3(0.2f, 0.4f, 1.3f), Vector3.one * 0.2f, EyeIdle).GetComponent<Renderer>()
+                Part(PrimitiveType.Sphere, "EyeL", root, new Vector3(-0.24f, 0.6f, 1.45f), Vector3.one * 0.17f, EyeIdle).GetComponent<Renderer>(),
+                Part(PrimitiveType.Sphere, "EyeR", root, new Vector3(0.24f, 0.6f, 1.45f), Vector3.one * 0.17f, EyeIdle).GetComponent<Renderer>()
             };
-            var wingColor = new Color(0.2f, 0.1f, 0.22f);
-            var wingL = new GameObject("WingL").transform;
-            wingL.SetParent(root, false);
-            wingL.localPosition = new Vector3(-0.5f, 0.2f, 0);
-            Part(PrimitiveType.Cube, "Membrane", wingL, new Vector3(-1.2f, 0, 0), new Vector3(2.4f, 0.08f, 1.2f), wingColor);
-            var wingR = new GameObject("WingR").transform;
-            wingR.SetParent(root, false);
-            wingR.localPosition = new Vector3(0.5f, 0.2f, 0);
-            Part(PrimitiveType.Cube, "Membrane", wingR, new Vector3(1.2f, 0, 0), new Vector3(2.4f, 0.08f, 1.2f), wingColor);
+
+            // 독수리 앞발톱 (앞으로 뻗어 움켜쥐려는 자세)
+            foreach (int side in new[] { -1, 1 })
+            {
+                Part(PrimitiveType.Capsule, "ForeLeg", root, new Vector3(side * 0.36f, -0.5f, 0.75f), new Vector3(0.2f, 0.4f, 0.2f), beak)
+                    .transform.localRotation = Quaternion.Euler(-50f, 0f, 0f);
+                Part(PrimitiveType.Cube, "Talons", root, new Vector3(side * 0.36f, -0.78f, 1.08f), new Vector3(0.3f, 0.1f, 0.34f), new Color(0.2f, 0.18f, 0.16f));
+            }
+
+            var wingL = MakeGriffinWing(root, "WingL", -1, wingColor, wingTip);
+            var wingR = MakeGriffinWing(root, "WingR", 1, wingColor, wingTip);
 
             return new Monster
             {
                 root = root, wingL = wingL, wingR = wingR, eyes = eyes, home = home,
                 forward = Vector3.forward, circlePhase = Random.Range(0f, Mathf.PI * 2f)
             };
+        }
+
+        /// <summary>깃털 날개: 안쪽은 갈색, 끝은 밝은 깃 세 가닥</summary>
+        Transform MakeGriffinWing(Transform root, string name, int side, Color wingColor, Color wingTip)
+        {
+            var w = new GameObject(name).transform;
+            w.SetParent(root, false);
+            w.localPosition = new Vector3(side * 0.5f, 0.35f, 0.15f);
+            Part(PrimitiveType.Cube, "Inner", w, new Vector3(side * 1.1f, 0, 0), new Vector3(2.2f, 0.1f, 1.5f), wingColor);
+            Part(PrimitiveType.Cube, "Outer", w, new Vector3(side * 2.7f, 0, -0.2f), new Vector3(1.4f, 0.08f, 1.15f), wingColor);
+            for (int i = 0; i < 3; i++)
+                Part(PrimitiveType.Cube, "Feather", w, new Vector3(side * (3.3f + i * 0.28f), 0, -0.55f + i * 0.4f), new Vector3(0.75f, 0.06f, 0.3f), wingTip)
+                    .transform.localRotation = Quaternion.Euler(0f, side * (20f - i * 18f), 0f);
+            return w;
+        }
+
+        // ───────── 경계 표시용 (AwarenessMarks) ─────────
+
+        public int GriffinCount => _monsters.Count;
+
+        /// <summary>
+        /// i번째 그리핀이 드래곤을 어떻게 보고 있는지.
+        /// alerted = 쫓아오는 중 (!), suspicious = 가까워져서 의심하는 중 (?). 쓰러졌거나 물고 물러나는 중이면 둘 다 false
+        /// </summary>
+        public Transform Griffin(int i, Vector3 dragon, out bool suspicious, out bool alerted)
+        {
+            suspicious = alerted = false;
+            var m = _monsters[i];
+            if (!m.root || !m.root.gameObject.activeInHierarchy) return m.root;
+            alerted = m.chasing;
+            suspicious = !alerted && Time.time >= m.retreatUntil
+                         && HostileRules.Suspects(m.root.position, m.home, dragon, settings);
+            return m.root;
         }
 
         GameObject Part(PrimitiveType type, string name, Transform parent, Vector3 localPos, Vector3 scale, Color color)

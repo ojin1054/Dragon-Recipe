@@ -22,7 +22,7 @@ namespace DragonRecipe.EditorTools
     /// 이미 있는 데이터 에셋(Stage_*, Food_*, GameConfig)은 덮어쓰지 않는다.
     /// (배치 모드: -executeMethod DragonRecipe.EditorTools.PrototypeSceneBuilder.Build)
     /// </summary>
-    public static class PrototypeSceneBuilder
+    public static partial class PrototypeSceneBuilder
     {
         const string Root = "Assets/_Project";
         const string DataDir = Root + "/Data";
@@ -103,13 +103,16 @@ namespace DragonRecipe.EditorTools
 
             EditorSceneManager.SaveScene(scene, ScenePath);
 
+            BuildWarScene(stages, foods, config, mats); // 참전 중 비행 전용 전장
+
             BuildNestScene(config, stages[0], mats);
 
             // 둥지가 첫 화면
             EditorBuildSettings.scenes = new[]
             {
                 new EditorBuildSettingsScene(NestScenePath, true),
-                new EditorBuildSettingsScene(ScenePath, true)
+                new EditorBuildSettingsScene(ScenePath, true),
+                new EditorBuildSettingsScene(WarScenePath, true)
             };
             AssetDatabase.SaveAssets();
             Debug.Log($"[Dragon Recipe] 씬 생성 완료: {NestScenePath}, {ScenePath}");
@@ -200,6 +203,7 @@ namespace DragonRecipe.EditorTools
             if (!cfg.combineTable) cfg.combineTable = FarmDataBuilder.EnsureTable();
             cfg.nestScene = Path.GetFileNameWithoutExtension(NestScenePath);
             cfg.flightScene = Path.GetFileNameWithoutExtension(ScenePath);
+            cfg.warScene = Path.GetFileNameWithoutExtension(WarScenePath);
             EditorUtility.SetDirty(cfg);
             return cfg;
         }
@@ -550,6 +554,13 @@ namespace DragonRecipe.EditorTools
                     wander: 1.4f, flees: true, flee: 7f, weight: 1f), strength: 12f, herdMin: 1, herdMax: 2, struggles: true),
                 Hunt(Food("mushroom", "숲버섯", 5, FoodTrait.Plant, new Color(0.82f, 0.2f, 0.24f), new Vector3(0.5f, 0.6f, 0.5f),
                     wander: 0f, flees: false, flee: 0f, weight: 1.5f), strength: 2f, herdMin: 2, herdMax: 4),
+                // 종족이 기르는 가축: 야생으로는 나오지 않고(weight 0) 목동 곁 목장에만 있다 (TribeHerds)
+                Hunt(Food("cow", "소", 26, FoodTrait.Meat, new Color(0.93f, 0.9f, 0.84f), new Vector3(1f, 0.95f, 1.8f),
+                    wander: 0.6f, flees: false, flee: 0f, weight: 0f), strength: 22f, herdMin: 3, herdMax: 4),
+                Hunt(Food("bison", "들소", 30, FoodTrait.Meat, new Color(0.3f, 0.2f, 0.15f), new Vector3(1.1f, 1.1f, 1.9f),
+                    wander: 0.9f, flees: false, flee: 0f, weight: 0f), strength: 28f, herdMin: 2, herdMax: 3, struggles: true),
+                Hunt(Food("moon_deer", "달사슴", 18, FoodTrait.Plant, new Color(0.8f, 0.86f, 0.96f), new Vector3(0.6f, 1.05f, 1.4f),
+                    wander: 1.3f, flees: true, flee: 10f, weight: 0f), strength: 12f, herdMin: 2, herdMax: 3),
             };
         }
 
@@ -670,17 +681,11 @@ namespace DragonRecipe.EditorTools
             ground.transform.localScale = new Vector3(100, 1, 100); // 1km x 1km
             ground.GetComponent<Renderer>().sharedMaterial = mats.Grass;
 
-            // 출발 절벽: 둥지 → 도움닫기 길 → 절벽 끝 (+z 방향)
-            const float back = 8f; // 둥지 뒤 여유
-            float cliffLength = RunUpLength + back;
-            Prim(PrimitiveType.Cube, "Cliff", world, new Vector3(0, CliffHeight * 0.5f, CliffEdgeZ - cliffLength * 0.5f),
-                new Vector3(14, CliffHeight, cliffLength), mats.Rock);
+            // 출발 지점: 좌우·위아래로 쭉 이어지는 절벽 벽 + 벽에 파인 동굴(둥지) + 튀어나온 발판.
+            // 동굴 안 둥지에서 달려 나와 발판 끝에서 도약한다 (+z 방향)
             Prim(PrimitiveType.Cylinder, "NestRing", world, new Vector3(0, CliffHeight + 0.15f, CliffEdgeZ - RunUpLength),
                 new Vector3(4f, 0.3f, 4f), mats.Nest, keepCollider: false);
-            // [임시] 둥지 동굴: 동굴 안에서 출발해 입구로 달려 나간다.
-            // 따라오는 카메라(성체는 둥지 뒤 약 20m, 위 9m)가 안쪽에 들어가도록 뒤로 깊고 천장이 높다
-            BuildCave(world, new Vector3(0, CliffHeight, CliffEdgeZ - RunUpLength), Vector3.forward,
-                width: 12f, height: 10f, back: 24f, front: CaveMouthAhead, floorDepth: CliffHeight, mats, seed: 3);
+            CliffWall.Build(world, new Vector3(0, CliffHeight, CliffEdgeZ - RunUpLength), CliffEdgeZ, mats.Rock, mats.CaveRock);
 
             // 도약 구간 (노란 띠) + 절벽 끝 흰 선 (완벽 거리)
             float zone = launch.jumpZoneLength;
@@ -847,8 +852,8 @@ namespace DragonRecipe.EditorTools
             while (true)
             {
                 var p = new Vector3(Range(rng, -200, 200), 0, Range(rng, -40, 420));
-                bool inCave = Mathf.Abs(p.x) < 15f && p.z < CliffEdgeZ;
-                if (!inCave && new Vector2(p.x, p.z).magnitude > keepOut) return p;
+                bool inWall = p.z < CliffEdgeZ + 4f; // 절벽 벽 속
+                if (!inWall && new Vector2(p.x, p.z).magnitude > keepOut) return p;
             }
         }
 

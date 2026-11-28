@@ -58,6 +58,14 @@ namespace DragonRecipe.Hostile
         }
 
         /// <summary>몬스터가 드래곤을 쫓기 시작하는지: 가깝고, 자기 자리에서 너무 멀지 않음</summary>
+        /// <summary>그리핀이 드래곤을 의심하는지: 아직 쫓아올 거리는 아니지만 그 근처까지 들어옴</summary>
+        public static bool Suspects(Vector3 monster, Vector3 home, Vector3 dragon, HostileParams p)
+        {
+            float r = p.monsterAggroRadius * Mathf.Max(1f, p.monsterSuspectScale);
+            return (dragon - monster).sqrMagnitude <= r * r
+                   && (monster - home).sqrMagnitude <= p.monsterLeashRadius * p.monsterLeashRadius;
+        }
+
         public static bool ShouldChase(Vector3 monster, Vector3 home, Vector3 dragon, HostileParams p)
             => (dragon - monster).sqrMagnitude <= p.monsterAggroRadius * p.monsterAggroRadius
                && (monster - home).sqrMagnitude <= p.monsterLeashRadius * p.monsterLeashRadius;

@@ -46,6 +46,8 @@ namespace DragonRecipe.Core
         public event Action Struggled;
         /// <summary>너무 무거워 들어 올리지 못함 (동물 힘의 합이 한계를 넘음)</summary>
         public event Action<Prey> SnatchRefused;
+        /// <summary>먹이를 낚아챔 (어떤 먹이인지. 가축 도둑질 판정 등에 쓴다)</summary>
+        public event Action<Prey> Snatched;
         /// <summary>힘이 넘쳐 몸이 휘청임 (세기 0~1)</summary>
         public event Action<float> Overloaded;
 
@@ -232,6 +234,7 @@ namespace DragonRecipe.Core
                 dragon.Model.Boost(HuntRules.ComboBoost(CurrentCombo, hunt), hunt.comboBoostTime);
             }
             Caught?.Invoke(CurrentCombo);
+            Snatched?.Invoke(prey);
             CarryChanged?.Invoke();
 
             _nextStruggle = Time.time + hunt.struggleInterval;

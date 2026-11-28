@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace DragonRecipe.Hostile
 {
-    /// <summary>드래곤을 공격하는 적(사냥꾼 무리, 날개 몬스터) 수치.</summary>
+    /// <summary>드래곤을 공격하는 적(사냥꾼 무리, 그리핀) 수치.</summary>
     [Serializable]
     public class HostileParams
     {
@@ -35,13 +35,15 @@ namespace DragonRecipe.Hostile
         public float hunterFleeSpeed = 6f;
         public float hunterWalkSpeed = 1.2f;
 
-        [Header("날개 몬스터")]
+        [Header("그리핀")]
         public int monsterCount = 5;
         [Tooltip("둥지(맴도는 자리)의 지면 위 높이")]
         public float monsterHoverHeight = 16f;
         public float monsterCircleRadius = 10f;
         [Tooltip("드래곤이 이 거리 안에 오면 쫓아온다")]
         public float monsterAggroRadius = 55f;
+        [Tooltip("쫓아오는 거리의 이 배율 안이면 드래곤을 의심한다 (머리 위 ?)")]
+        public float monsterSuspectScale = 1.6f;
         [Tooltip("자기 자리에서 이만큼 멀어지면 포기하고 돌아간다")]
         public float monsterLeashRadius = 110f;
         public float monsterIdleSpeed = 8f;

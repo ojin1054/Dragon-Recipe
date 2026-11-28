@@ -301,6 +301,16 @@ namespace DragonRecipe.Tests
         }
 
         [Test]
+        public void WarMapWaves_AreLargerThanRaids_AndGrow()
+        {
+            var s = Settings();
+            Assert.AreEqual(s.warBaseSize, TribeLogic.WarRaidSize(0, s));
+            Assert.Greater(TribeLogic.WarRaidSize(1, s), TribeLogic.WarRaidSize(0, s));
+            for (int w = 0; w < s.warWaves; w++)
+                Assert.Greater(TribeLogic.WarRaidSize(w, s), TribeLogic.RaidSize(w, s), $"wave {w}");
+        }
+
+        [Test]
         public void War_StartsByChance_AfterCooldown()
         {
             var s = Settings();

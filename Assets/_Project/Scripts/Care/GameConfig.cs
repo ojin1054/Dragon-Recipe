@@ -20,6 +20,8 @@ namespace DragonRecipe.Care
 
         public string nestScene = "Nest";
         public string flightScene = "FlightPrototype";
+        [Tooltip("참전 중 비행 전용 전장")]
+        public string warScene = "WarBattle";
 
         public DragonStageData StageData(GrowthStage stage)
         {

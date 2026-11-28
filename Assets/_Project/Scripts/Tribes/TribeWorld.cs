@@ -131,8 +131,20 @@ namespace DragonRecipe.Tribes
             DragonCare.TribesChanged += OnTribesChanged;
             _homeNest = session.nest;
             _homeEdge = session.launchEdge;
+            _warMap = WarMap.Current ? WarMap.Current : FindAnyObjectByType<WarMap>();
+            if (LeaveWarMapIfNoWar()) return;
             Build();
             ApplyLaunchSite();
+        }
+
+        /// <summary>전쟁 맵인데 참전한 전쟁이 없으면(끝났거나 디버그로 지움) 평소 비행 맵으로 보낸다</summary>
+        bool LeaveWarMapIfNoWar()
+        {
+            if (!_warMap) return false;
+            var st = State;
+            if (st == null || st.war.status == WarStatus.Joined) return false;
+            SceneFlow.GoToFlight();
+            return true;
         }
 
         static TribeState State => DragonCare.IsLoaded ? DragonCare.Tribes : null;
@@ -142,6 +154,7 @@ namespace DragonRecipe.Tribes
         {
             // 다시 날기: 바뀐 호감도·전쟁에 맞춰 주민과 병사를 새로 세운다
             if (s != FlightSession.State.Ready || !_built) return;
+            if (LeaveWarMapIfNoWar()) return; // 전쟁이 끝난 뒤 다시 날기
             Populate();
             ApplyLaunchSite(); // 참전 중이면 편든 쪽 망루에서 출발
         }
@@ -574,6 +587,11 @@ namespace DragonRecipe.Tribes
         {
             if (_built || State == null) return;
             _built = true;
+            if (_warMap)
+            {
+                BuildWarCamps();
+                return;
+            }
             Vector3 c = area ? area.areaCenter : new Vector3(0, 0, 200);
             BuildVillage(Tribe.Human, c + new Vector3(humanVillage.x, 0, humanVillage.y));
             BuildVillage(Tribe.Orc, c + new Vector3(orcVillage.x, 0, orcVillage.y));
