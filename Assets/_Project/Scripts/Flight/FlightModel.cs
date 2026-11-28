@@ -63,6 +63,30 @@ namespace DragonRecipe.Flight
         public Vector3 Velocity => Forward * Speed + Vector3.up * VerticalSpeed;
         public Quaternion Rotation => Quaternion.Euler(-Pitch, Yaw, -Bank);
         public bool IsStalling => Speed < Params.stallSpeed;
+        /// <summary>얼마나 깊이 하강 중인지 (0 = 수평 이상, 1 = 숙일 수 있는 한계 이상)</summary>
+        public float DiveFactor
+        {
+            get
+            {
+                float full = Mathf.Sin(Mathf.Clamp(Params.maxPitchDown, 1f, 90f) * Mathf.Deg2Rad);
+                return Mathf.Clamp01(-Mathf.Sin(Pitch * Mathf.Deg2Rad) / full);
+            }
+        }
+        /// <summary>기수가 수직을 넘어가 등이 땅을 향함 (공중제비 윗부분)</summary>
+        public bool IsInverted => Pitch > 90f || Pitch < -90f;
+
+        /// <summary>
+        /// 기수 각도 정리. 공중제비를 허용하면 (-180, 180]로 감기만 하고,
+        /// 똑바로 나는 중 아래로 숙이는 것만 maxPitchDown에서 막는다 (뒤집혀 내려오는 공중제비 후반은 통과).
+        /// 허용하지 않으면 예전처럼 위아래 한계에서 자른다.
+        /// </summary>
+        static float ClampPitch(float before, float after, FlightParams p)
+        {
+            if (!p.allowLoops) return Mathf.Clamp(after, -p.maxPitchDown, p.maxPitchUp);
+            if (after < before && before >= -p.maxPitchDown && before <= 90f && after < -p.maxPitchDown)
+                after = -p.maxPitchDown;
+            return Mathf.DeltaAngle(0f, after);
+        }
         public bool IsDead => Health <= 0f;
         public float TimeSinceLastFlap => Time - _lastFlapTime;
 
@@ -97,7 +121,7 @@ namespace DragonRecipe.Flight
         public void Jolt(float bankDelta, float pitchDelta, float staminaCost)
         {
             Bank = Mathf.Clamp(Bank + bankDelta, -Params.maxBank, Params.maxBank);
-            Pitch = Mathf.Clamp(Pitch + pitchDelta, -Params.maxPitchDown, Params.maxPitchUp);
+            Pitch = ClampPitch(Pitch, Pitch + pitchDelta, Params);
             Stamina = Mathf.Max(0f, Stamina - staminaCost);
         }
 
@@ -195,6 +219,13 @@ namespace DragonRecipe.Flight
         public void Skid(float dt)
         {
             if (VerticalSpeed < 0f) VerticalSpeed = 0f;
+            if (IsInverted)
+            {
+                // 뒤집힌 채 닿음: 가던 방향은 그대로 두고 몸만 바로 세운다 (뒤집힌 기수는 Yaw의 반대쪽을 향하고 있었음)
+                Yaw += 180f;
+                Bank = -Bank;
+                Pitch = 0f;
+            }
             if (Pitch < 0f) Pitch = 0f;
             Speed = Mathf.Max(Params.minSpeed, Speed - Params.groundFriction * dt);
             Health = Mathf.Max(0f, Health - Params.skidDamagePerSecond * dt);
@@ -207,14 +238,18 @@ namespace DragonRecipe.Flight
             stick = Vector2.ClampMagnitude(stick, 1f);
 
             // 기수: 스틱은 기수를 "돌리는" 입력. 손을 떼면 그 각도를 그대로 유지한다 (자동 수평 복귀 없음)
+            float before = Pitch;
             Pitch += stick.y * p.pitchResponse * dt;
-            if (IsStalling && Pitch > StallNoseDownPitch)
+            if (IsStalling)
             {
-                // 실속하면 기수가 떨어져 속도를 회복하려 한다 (유일한 자동 개입)
+                // 실속하면 기수가 떨어져 속도를 회복하려 한다 (유일한 자동 개입).
+                // 수직을 넘겨 뒤집힌 채 멈추면 앞으로 넘어간다 (공중제비 윗부분에서 힘이 빠진 경우)
                 float stall = 1f - Mathf.Clamp01(Speed / p.stallSpeed);
-                Pitch = Mathf.MoveTowards(Pitch, StallNoseDownPitch, (StallNoseDropRate * (stall + 0.3f)) * dt);
+                float rate = StallNoseDropRate * (stall + 0.3f) * dt;
+                if (Pitch > 90f) Pitch = Mathf.MoveTowards(Pitch, 180f - StallNoseDownPitch, rate);
+                else if (Pitch > StallNoseDownPitch) Pitch = Mathf.MoveTowards(Pitch, StallNoseDownPitch, rate);
             }
-            Pitch = Mathf.Clamp(Pitch, -p.maxPitchDown, p.maxPitchUp);
+            Pitch = ClampPitch(before, Pitch, p);
 
             // 선회: 스틱 좌우는 몸을 "기울이는" 입력. 손을 떼면 기울기를 유지하고,
             // 기울어진 만큼 계속 선회한다 (수평으로 돌리려면 반대로 밀어야 함)
@@ -222,20 +257,28 @@ namespace DragonRecipe.Flight
             float turnLoad = TurnLoadMultiplier;
             Bank += stick.x * p.bankResponse * turnLoad * dt;
             Bank = Mathf.Clamp(Bank, -p.maxBank, p.maxBank);
-            Yaw += (Bank / Mathf.Max(1f, p.maxBank)) * p.turnRate * turnLoad * dt;
+            // 뒤집혀 있을 때(공중제비 윗부분)는 같은 쪽으로 기울여도 진행 방향이 반대로 돈다
+            float upright = IsInverted ? -1f : 1f;
+            Yaw += upright * (Bank / Mathf.Max(1f, p.maxBank)) * p.turnRate * turnLoad * dt;
 
             // 속도: 내려가면 가속, 올라가면 감속
+            // 하강: 숙인 만큼(dive 0~1) 중력을 더 크게 받고, 날개를 접어 공기 저항이 줄고, 최고 속도도 더 열린다
             float sinPitch = Mathf.Sin(Pitch * Mathf.Deg2Rad);
-            Speed += (-p.gravity * sinPitch - p.drag * Speed * Speed) * dt;
+            float dive = DiveFactor;
+            float pull = sinPitch < 0f ? p.gravity * Mathf.Max(1f, p.diveAcceleration) : p.gravity;
+            float drag = p.drag * Mathf.Lerp(1f, Mathf.Clamp01(p.diveDragScale), dive);
+            float topSpeed = p.maxSpeed + Mathf.Max(0f, p.diveMaxSpeedBonus) * dive;
+            Speed += (-pull * sinPitch - drag * Speed * Speed) * dt;
             // 추가 속도가 붙어 있는 동안은 최고 속도를 넘을 수 있다 (끝나면 공기 저항으로 서서히 줄어듦)
             if (BoostTimeLeft > 0f)
             {
                 BoostTimeLeft = Mathf.Max(0f, BoostTimeLeft - dt);
-                Speed = Mathf.Clamp(Speed, p.minSpeed, p.maxSpeed + BoostSpeed);
+                Speed = Mathf.Clamp(Speed, p.minSpeed, topSpeed + BoostSpeed);
             }
-            else if (Speed > p.maxSpeed)
+            else if (Speed > topSpeed)
             {
-                Speed = Mathf.Max(p.maxSpeed, Speed - p.maxSpeed * 0.5f * dt);
+                // 하강을 풀면 붙었던 속도가 서서히 빠진다 (바로 깎이지 않아 저공 스침으로 이어 갈 수 있음)
+                Speed = Mathf.Max(topSpeed, Speed - p.maxSpeed * 0.25f * dt);
             }
             else
             {

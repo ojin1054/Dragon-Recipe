@@ -126,7 +126,7 @@ namespace DragonRecipe.UI
             if (!DragonCare.IsLoaded) return;
             DragonCare.Tick();
             var s = DragonCare.State;
-            var c = DragonCare.Config.care;
+            var c = DragonCare.Care;
 
             if (s.stage != _shownStage)
             {

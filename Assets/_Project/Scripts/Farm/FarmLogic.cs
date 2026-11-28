@@ -84,7 +84,7 @@ namespace DragonRecipe.Farm
 
         // ───────────── 조합 ─────────────
 
-        public static bool HasCombineSlot(FarmState f, FarmSettings s) => f.jobs.Count < s.combineSlots;
+        public static bool HasCombineSlot(FarmState f, FarmSettings s) => f.jobs.Count < s.combineSlots + f.bonusCombineSlots;
 
         public static CombineBlock CanCombine(FarmState f, FarmSettings s, CombineTable t, string uidA, string uidB,
             out CombineRecipe recipe)

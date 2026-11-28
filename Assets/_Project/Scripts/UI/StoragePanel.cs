@@ -36,9 +36,9 @@ namespace DragonRecipe.UI
         {
             if (!DragonCare.IsLoaded) return;
             var s = DragonCare.State;
-            var c = DragonCare.Config.care;
+            var c = DragonCare.Care;
             bool room = CareLogic.HasRoom(s, c);
-            string key = $"{s.storage.Count}|{room}|{s.generation}";
+            string key = $"{s.storage.Count}|{room}|{s.generation}|{c.storageCapacity}";
             foreach (var f in s.storage) key += f.id[0];
             if (key == _key) return;
             _key = key;

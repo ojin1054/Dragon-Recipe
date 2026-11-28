@@ -29,6 +29,14 @@ namespace DragonRecipe.Flight
         public float stallSpeed = 8f;
         public float maxSpeed = 40f;
 
+        [Header("하강 (기수를 숙이면 날개를 접고 내리꽂는다)")]
+        [Tooltip("하강 중 중력이 속도로 바뀌는 배율 (1 = 예전과 같음). 클수록 빨리 가속")]
+        public float diveAcceleration = 1.8f;
+        [Tooltip("최대로 숙였을 때 공기 저항 배율 (1 = 그대로, 작을수록 날개를 접어 덜 받음)")]
+        public float diveDragScale = 0.45f;
+        [Tooltip("최대로 숙였을 때 최고 속도에 더해지는 값 (m/s). 덜 숙이면 그만큼 덜 붙는다")]
+        public float diveMaxSpeedBonus = 20f;
+
         [Header("이륙: 달리기 (= 파워 → 출발 속도)")]
         [Tooltip("탭 한 번에 붙는 달리기 속도 (m/s)")]
         public float runTapAccel = 1.5f;
@@ -63,7 +71,10 @@ namespace DragonRecipe.Flight
         public float stumblePitch = -15f;
 
         [Header("조종")]
+        [Tooltip("공중제비 허용: 켜면 기수를 계속 당겨 세로로 한 바퀴 돌 수 있다 (maxPitchUp은 카메라가 따라 돌기 시작하는 각도로만 쓰임)")]
+        public bool allowLoops = true;
         public float maxPitchUp = 35f;
+        [Tooltip("똑바로 나는 중 기수를 숙일 수 있는 한계 (공중제비로 뒤집혀 있을 때는 제한 없음)")]
         public float maxPitchDown = 70f;
         [Tooltip("스틱을 끝까지 밀었을 때 기수가 돌아가는 속도 (deg/s). 손을 떼면 그 각도를 유지")]
         public float pitchResponse = 60f;

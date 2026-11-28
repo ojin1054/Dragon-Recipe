@@ -92,6 +92,8 @@ namespace DragonRecipe.Skills
         [Tooltip("적 피해 (구체는 한 방, 브레스는 초당)")]
         public float damage = 1f;
         public float pushForce = 14f;
+
+        public SkillSpec Clone() => (SkillSpec)MemberwiseClone();
     }
 
     /// <summary>모든 스킬 수치. 구체는 성질 순서(고기·물고기·불·식물), 브레스는 성체 모습별</summary>

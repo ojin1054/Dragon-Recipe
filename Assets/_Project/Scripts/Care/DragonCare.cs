@@ -5,6 +5,7 @@ using DragonRecipe.Farm;
 using DragonRecipe.Flight;
 using DragonRecipe.Food;
 using DragonRecipe.Tribes;
+using DragonRecipe.Upgrades;
 using UnityEngine;
 
 namespace DragonRecipe.Care
@@ -61,6 +62,8 @@ namespace DragonRecipe.Care
         public static event Action<List<CombineResult>> CombinesCollected;
         /// <summary>종족 호감도·제단·전쟁이 바뀜</summary>
         public static event Action TribesChanged;
+        /// <summary>업그레이드를 배움</summary>
+        public static event Action UpgradesChanged;
 
         public static void EnsureLoaded(GameConfig config)
         {
@@ -86,6 +89,8 @@ namespace DragonRecipe.Care
             s.farm.jobs ??= new List<CombineJob>();
             s.farm.buffs ??= new List<ActiveBuff>();
             s.farm.recipes ??= new List<RecipeRecord>();
+            s.upgrades ??= new UpgradeState();
+            s.upgrades.owned ??= new List<string>();
             s.tribes ??= TribeLogic.CreateNew(Config.tribes ?? new TribeSettings());
             TribeLogic.Ensure(s.tribes, Config.tribes ?? new TribeSettings());
             if (s.generation <= 0) s.generation = 1;
@@ -101,7 +106,14 @@ namespace DragonRecipe.Care
         public static void Tick()
         {
             if (!IsLoaded) return;
-            CareLogic.ApplyElapsed(State, Config.care, Clock());
+            CareLogic.ApplyElapsed(State, Care, Clock());
+            // 정기 제물 (종족 1단 업그레이드): 시간이 찬 만큼 제단에 올리고, 창고에 자리가 있으면 옮긴다
+            if (UpgradeLogic.TickOfferings(State, TribeSettings, Upgrades, Clock()) > 0)
+            {
+                CollectOfferings();
+                Save();
+                TribesChanged?.Invoke();
+            }
         }
 
         public static void Save()
@@ -121,6 +133,7 @@ namespace DragonRecipe.Care
             Tick();
             var p = CareLogic.FlightParamsFor(data.FlightWithStats(CareStats.Base()), State, Config.care); // 능력치(힘·스태미나·체력) → 굶주림 → 버프
             p = FarmBuffs.Apply(p, State.farm.buffs);
+            p = FarmBuffs.Apply(p, new[] { Upgrades.AsBuff() }); // 배운 업그레이드
             return FarmBuffs.Apply(p, TribeLogic.Blessings(State.tribes, TribeSettings));
         }
 
@@ -160,7 +173,7 @@ namespace DragonRecipe.Care
                 {
                     report.dropped.Add(c.food);
                 }
-                else if (CareLogic.Store(State, Config.care, c.food.id, c.satiety, c.food.trait, c.rare))
+                else if (CareLogic.Store(State, Care, c.food.id, c.satiety, c.food.trait, c.rare))
                 {
                     report.stored.Add(c.food);
                 }
@@ -170,7 +183,7 @@ namespace DragonRecipe.Care
                 }
             }
 
-            if (result.Injured) State.injured = true;
+            if (result.Injured) State.injured = !Upgrades.healOnReturn; // 약초 둥지: 돌아오면 낫는다
             State.totalFlights++;
             // 버프는 비행 횟수로 유지된다: 한 번 날고 오면 1씩 줄어든다
             if (State.farm.buffs.Count > 0)
@@ -273,6 +286,81 @@ namespace DragonRecipe.Care
             return true;
         }
 
+        // ───────────── 업그레이드 ─────────────
+
+        /// <summary>업그레이드를 배울 때마다 오른다 (효과를 캐시한 쪽이 비교)</summary>
+        public static int UpgradeVersion { get; private set; }
+
+        static UpgradeBonus _bonus;
+        static DragonState _bonusFor;
+        static int _bonusKey;
+        static CareSettings _care;
+        static CareSettings _careSrc;
+        static int _careKey;
+        static float _careAt;
+
+        static int BonusKey()
+        {
+            int key = UpgradeVersion;
+            foreach (var t in TribeLogic.All) key = key * 8 + (int)TribeLogic.StandingOf(State.tribes, t, TribeSettings);
+            return key;
+        }
+
+        /// <summary>지금 켜져 있는 업그레이드 효과 (종족과 사이가 틀어지면 그 종족 업그레이드는 빠진다)</summary>
+        public static UpgradeBonus Upgrades
+        {
+            get
+            {
+                if (!IsLoaded) return _bonus = new UpgradeBonus();
+                int key = BonusKey();
+                if (_bonus == null || _bonusFor != State || key != _bonusKey)
+                {
+                    _bonus = UpgradeLogic.BonusOf(State, TribeSettings);
+                    _bonusFor = State;
+                    _bonusKey = key;
+                }
+                return _bonus;
+            }
+        }
+
+        /// <summary>업그레이드(창고 칸, 허기 속도)를 반영한 육성 수치. 창고·허기를 다룰 때는 Config.care 대신 이걸 쓴다</summary>
+        public static CareSettings Care
+        {
+            get
+            {
+                if (!Config) return null;
+                if (State == null) return Config.care;
+                var b = Upgrades;
+                // 에디터에서 수치를 고쳐도 따라가도록 1초마다 다시 만든다
+                if (_care == null || _careSrc != Config.care || _careKey != _bonusKey || Time.realtimeSinceStartup - _careAt > 1f)
+                {
+                    _care = Config.care.Clone();
+                    _care.storageCapacity += b.storageSlots;
+                    _care.hungerDecayPerHour *= b.hungerDecay;
+                    _careSrc = Config.care;
+                    _careKey = _bonusKey;
+                    _careAt = Time.realtimeSinceStartup;
+                }
+                return _care;
+            }
+        }
+
+        public static UpgradeStatus UpgradeStatusOf(UpgradeNode n)
+            => IsLoaded && n != null ? UpgradeLogic.StatusOf(n, State, TribeSettings) : UpgradeStatus.Locked;
+
+        /// <summary>창고 먹이로 값을 치르고 업그레이드를 배운다</summary>
+        public static bool BuyUpgrade(string id)
+        {
+            if (!IsLoaded) return false;
+            var n = UpgradeCatalog.Find(id);
+            if (!UpgradeLogic.Buy(n, State, TribeSettings)) return false;
+            UpgradeVersion++;
+            Save();
+            UpgradesChanged?.Invoke();
+            FarmChanged?.Invoke(); // 우리 확장 · 조합 슬롯
+            return true;
+        }
+
         // ───────────── 종족 ─────────────
 
         public static TribeState Tribes => State?.tribes;
@@ -302,6 +390,14 @@ namespace DragonRecipe.Care
             TribesChanged?.Invoke();
         }
 
+        /// <summary>종족이 기르는 가축을 낚아챔: 그 종족의 호감도가 떨어진다</summary>
+        public static void ReportLivestockTheft(Tribe owner, float loss)
+        {
+            if (!IsLoaded) return;
+            TribeLogic.Add(State.tribes, owner, -Mathf.Max(0f, loss), TribeSettings);
+            TribesChanged?.Invoke();
+        }
+
         /// <summary>엘프 땅에서 먹이를 사냥함</summary>
         public static void ReportElfLandHunt()
         {
@@ -325,7 +421,7 @@ namespace DragonRecipe.Care
                     continue;
                 }
                 float satiety = food.satiety * (o.rare ? 2f : 1f) /* 희귀 = 포만도 2배 */;
-                if (!CareLogic.Store(State, Config.care, food.id, satiety, food.trait, o.rare)) break;
+                if (!CareLogic.Store(State, Care, food.id, satiety, food.trait, o.rare)) break;
                 State.tribes.altar.RemoveAt(i);
                 moved++;
             }
@@ -494,6 +590,11 @@ namespace DragonRecipe.Care
             FarmChanged = null;
             CombinesCollected = null;
             TribesChanged = null;
+            UpgradesChanged = null;
+            UpgradeVersion = 0;
+            _bonus = null;
+            _bonusFor = null;
+            _care = null;
             LastTribeReport = null;
             Clock = () => DateTime.UtcNow;
         }

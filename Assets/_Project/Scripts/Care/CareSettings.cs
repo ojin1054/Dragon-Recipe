@@ -38,5 +38,7 @@ namespace DragonRecipe.Care
         [Header("성체 모습")]
         [Tooltip("한 성질이 전체 먹이의 이 비율 이상이면 그 성질의 모습, 아니면 골고루 먹은 모습")]
         [Range(0.26f, 1f)] public float formDominance = 0.4f;
+
+        public CareSettings Clone() => (CareSettings)MemberwiseClone();
     }
 }

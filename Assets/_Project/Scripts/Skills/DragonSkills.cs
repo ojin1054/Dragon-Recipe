@@ -144,11 +144,25 @@ namespace DragonRecipe.Skills
         void OnFed(FeedOutcome _) => Refresh();
 
         /// <summary>돌봄 상태에서 지금 스킬을 다시 고른다. refill이면 구체 충전도 가득 채운다</summary>
+        SkillSpec _orbSrc, _breathSrc;
+        int _upgradeVersion = -1;
+
         public void Refresh(bool refill = false)
         {
             var state = DragonCare.IsLoaded ? DragonCare.State : null;
-            var orb = SkillRules.PickOrb(book, state);
-            var breath = SkillRules.PickBreath(book, state);
+            var orbSrc = SkillRules.PickOrb(book, state);
+            var breathSrc = SkillRules.PickBreath(book, state);
+            // 업그레이드를 반영한 사본을 쓴다. 고른 스킬과 업그레이드가 그대로면 사본도 그대로 둔다
+            SkillSpec orb = Orb, breath = Breath;
+            if (orbSrc != _orbSrc || breathSrc != _breathSrc || DragonCare.UpgradeVersion != _upgradeVersion)
+            {
+                var bonus = DragonCare.Upgrades;
+                orb = bonus.Apply(orbSrc);
+                breath = bonus.Apply(breathSrc);
+                _orbSrc = orbSrc;
+                _breathSrc = breathSrc;
+                _upgradeVersion = DragonCare.UpgradeVersion;
+            }
             if (orb == Orb && breath == Breath)
             {
                 if (refill && orb != null) Charges = new SkillCharges(orb.maxCharges, orb.cooldown);

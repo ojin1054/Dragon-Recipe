@@ -256,7 +256,7 @@ namespace DragonRecipe.UI
         {
             ClearChildren(_jobs);
             _jobViews.Clear();
-            for (int i = 0; i < settings.combineSlots; i++)
+            for (int i = 0; i < settings.combineSlots + f.bonusCombineSlots; i++)
             {
                 var slot = Rect($"Job_{i}", _jobs, Vector2.zero, new Vector2(580, 140));
                 var le = slot.gameObject.AddComponent<LayoutElement>();

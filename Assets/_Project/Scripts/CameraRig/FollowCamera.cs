@@ -61,14 +61,39 @@ namespace DragonRecipe.CameraRig
             float scale = Mathf.Max(0.1f, tr.localScale.x); // 성장해서 커지면 카메라도 물러남
             float dist = (distance + extraDistanceAtMaxSpeed * speedT) * scale;
 
-            pos = tr.position - flatForward * dist + Vector3.up * (height * scale);
+            // 공중제비: 기수가 높이 들릴수록 카메라도 같이 돌아 드래곤 등 뒤를 계속 따라간다 (뒤집히면 화면도 뒤집힘)
+            Vector3 back = flatForward, up = Vector3.up;
+            float loop = LoopFollow();
+            if (loop > 0f)
+            {
+                var body = Quaternion.Euler(-target.Model.Pitch, yaw, 0f);
+                back = Vector3.Slerp(flatForward, body * Vector3.forward, loop).normalized;
+                up = Vector3.Slerp(Vector3.up, body * Vector3.up, loop).normalized;
+            }
+
+            pos = tr.position - back * dist + up * (height * scale);
             // 카메라가 땅속으로 들어가지 않게
             if (Physics.Raycast(pos + Vector3.up * 50f, Vector3.down, out var hit, 100f, ~0, QueryTriggerInteraction.Ignore)
                 && hit.point.y < tr.position.y)
                 pos.y = Mathf.Max(pos.y, hit.point.y + 1f);
 
             Vector3 look = tr.position + (target.IsFlying ? target.Model.Velocity.normalized : flatForward) * lookAhead;
-            rot = Quaternion.LookRotation(look - pos, Vector3.up);
+            rot = Quaternion.LookRotation(look - pos, up);
+        }
+
+        /// <summary>
+        /// 공중제비를 따라 도는 정도 (0 = 평소 수평 추적, 1 = 기체를 그대로 따라감).
+        /// 평소 오르내리는 각도(maxPitchUp까지, 급강하)에서는 0이라 예전 느낌 그대로이고,
+        /// 그보다 들어 올려 수직에 가까워질수록 1로, 뒤집혀 있는 동안은 계속 1이다.
+        /// </summary>
+        float LoopFollow()
+        {
+            if (!target.IsFlying || target.Model == null || !target.Model.Params.allowLoops) return 0f;
+            float pitch = target.Model.Pitch;
+            if (target.Model.IsInverted) return 1f;
+            if (pitch >= 0f) return Mathf.InverseLerp(target.Model.Params.maxPitchUp, 80f, pitch);
+            // 뒤집힌 채 내려오는 공중제비 후반: 수직 아래(-90)에서 평소 급강하 한계까지 풀어 준다
+            return Mathf.InverseLerp(-target.Model.Params.maxPitchDown, -90f, pitch);
         }
     }
 }

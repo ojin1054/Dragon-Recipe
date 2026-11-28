@@ -105,6 +105,8 @@ namespace DragonRecipe.Farm
         public List<FarmAnimal> animals = new List<FarmAnimal>();
         /// <summary>상점에서 산 우리 확장 수</summary>
         public int penUpgradeLevel;
+        /// <summary>업그레이드로 늘어난 조합 슬롯 수</summary>
+        public int bonusCombineSlots;
         public List<CombineJob> jobs = new List<CombineJob>();
         public List<ActiveBuff> buffs = new List<ActiveBuff>();
         public List<RecipeRecord> recipes = new List<RecipeRecord>();

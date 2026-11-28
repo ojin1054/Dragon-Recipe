@@ -90,6 +90,9 @@ namespace DragonRecipe.Care
         /// <summary>사람·오크·엘프와의 관계 (호감도, 제단, 전쟁). 새 알을 부화시켜도 이어진다</summary>
         public DragonRecipe.Tribes.TribeState tribes = new DragonRecipe.Tribes.TribeState();
 
+        /// <summary>배운 업그레이드. 새 알은 이전 드래곤이 이어 자라는 것이라 그대로 이어진다</summary>
+        public DragonRecipe.Upgrades.UpgradeState upgrades = new DragonRecipe.Upgrades.UpgradeState();
+
         public static DragonState CreateNew(CareSettings s, DateTime nowUtc) => new DragonState
         {
             hunger = s.startingHunger,

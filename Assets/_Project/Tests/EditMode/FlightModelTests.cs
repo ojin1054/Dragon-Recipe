@@ -93,6 +93,53 @@ namespace DragonRecipe.Tests
         }
 
         [Test]
+        public void Diving_GoesPastLevelTopSpeed_AndFasterThanWithoutDiveBoost()
+        {
+            var m = NewHatchling(altitude: 1000f);
+            Run(m, 4f, new Vector2(0, -1));
+            Assert.Greater(m.Speed, m.Params.maxSpeed, "깊이 하강해도 수평 최고 속도를 못 넘음");
+            Assert.LessOrEqual(m.Speed, m.Params.maxSpeed + m.Params.diveMaxSpeedBonus + 0.01f);
+
+            var plain = new FlightModel(new FlightParams { diveAcceleration = 1f, diveDragScale = 1f, diveMaxSpeedBonus = 0f });
+            plain.Reset(new Vector3(0, 1000f, 0), 0f, 14f);
+            Run(plain, 4f, new Vector2(0, -1));
+            Assert.Greater(m.Speed, plain.Speed + 5f);
+        }
+
+        [Test]
+        public void Loop_PullingUpAtSpeed_GoesPastVerticalAndInverts()
+        {
+            var m = NewHatchling(altitude: 300f, speed: 40f);
+            bool inverted = false;
+            for (float t = 0; t < 4f && !inverted; t += Dt)
+            {
+                m.Step(Dt, new Vector2(0, 1));
+                inverted |= m.IsInverted;
+            }
+            Assert.IsTrue(inverted, "기수를 계속 당겨도 수직을 넘어 뒤집히지 않음");
+            Assert.LessOrEqual(m.Pitch, 180f);
+            Assert.Greater(m.Pitch, -180f);
+        }
+
+        [Test]
+        public void Loop_UprightPushDown_IsStillLimited()
+        {
+            var m = NewHatchling(altitude: 300f, speed: 25f);
+            Run(m, 3f, new Vector2(0, -1));
+            Assert.GreaterOrEqual(m.Pitch, -m.Params.maxPitchDown - 0.01f);
+        }
+
+        [Test]
+        public void Loop_Disabled_ClampsAtMaxPitchUp()
+        {
+            var m = new FlightModel(new FlightParams { allowLoops = false });
+            m.Reset(new Vector3(0, 300f, 0), 0f, 40f);
+            Run(m, 3f, new Vector2(0, 1));
+            Assert.LessOrEqual(m.Pitch, m.Params.maxPitchUp + 0.01f);
+            Assert.IsFalse(m.IsInverted);
+        }
+
+        [Test]
         public void Pitch_IsHeld_AfterReleasingStick()
         {
             var m = NewHatchling(speed: 25f); // 실속하지 않을 속도

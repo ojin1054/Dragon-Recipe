@@ -102,7 +102,8 @@ namespace DragonRecipe.Flight
             _crouch.AddBinding("<Gamepad>/rightTrigger");
 
             _pause = new InputAction("Pause", InputActionType.Button);
-            _pause.AddBinding("<Keyboard>/escape");
+            // 모바일의 Esc는 뒤로가기 버튼이라 종료 확인 팝업(ExitConfirmPopup)이 받는다
+            if (!Application.isMobilePlatform) _pause.AddBinding("<Keyboard>/escape");
             _pause.AddBinding("<Keyboard>/p");
             _pause.AddBinding("<Gamepad>/start");
             _pause.performed += _ => PausePressed?.Invoke();

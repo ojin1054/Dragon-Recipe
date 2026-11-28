@@ -174,6 +174,7 @@ namespace DragonRecipe.Care
             s.farm = old.farm ?? new DragonRecipe.Farm.FarmState();
             DragonRecipe.Farm.FarmLogic.OnNewEgg(s.farm);
             s.tribes = old.tribes ?? new DragonRecipe.Tribes.TribeState(); // 세상은 드래곤을 기억한다
+            s.upgrades = old.upgrades ?? new DragonRecipe.Upgrades.UpgradeState(); // 이전 드래곤이 이어 자란다
             return s;
         }
 
