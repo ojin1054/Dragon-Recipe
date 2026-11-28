@@ -365,7 +365,11 @@ namespace DragonRecipe.Tribes
 
         void JoinButton(Tribe side, Vector2 pos)
         {
-            var btn = Button(_war, "참전", pos, new Vector2(150, 60), new Color(0.75f, 0.25f, 0.15f, 0.95f), () => DragonCare.JoinWar(side));
+            var btn = Button(_war, "참전", pos, new Vector2(150, 60), new Color(0.75f, 0.25f, 0.15f, 0.95f), () =>
+            {
+                // 참전하면 바로 방어전 비행으로 (편든 쪽 망루에서 출발)
+                if (DragonCare.JoinWar(side)) SceneFlow.GoToFlight();
+            });
             // 버튼 안에 그 종족 얼굴
             var f = Img((RectTransform)btn.transform, "Face", new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(30, 0), new Vector2(46, 46), Color.white);
             f.sprite = TribeLook.Face(side);
