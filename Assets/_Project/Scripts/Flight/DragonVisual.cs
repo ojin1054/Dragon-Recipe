@@ -64,7 +64,7 @@ namespace DragonRecipe.Flight
                 return;
             }
             _flapT = 0f;
-            _flapStrength = outcome == FlapOutcome.Weak ? 0.5f : outcome == FlapOutcome.Perfect ? 1.2f : 1f;
+            _flapStrength = outcome == FlapOutcome.Perfect ? 1.2f : 1f;
         }
 
         void Update()

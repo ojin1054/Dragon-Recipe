@@ -63,9 +63,7 @@ MonoBehaviour:
     staminaRegenDelay: 0.5
     idealFlapInterval: 0.6
     perfectWindow: 0.2
-    spamInterval: 0.25
     perfectBonus: 1.3
-    spamPenalty: 0.35
     carryStrength: 60
     payloadLiftPenalty: 0.3
     payloadFlapPenalty: 0.25
@@ -73,11 +71,11 @@ MonoBehaviour:
     maxHealth: 170
     touchDamage: 2
     impactDamagePerSpeed: 6
-    impactFreeSpeed: 1
-    skidDamagePerSecond: 3
+    impactFreeSpeed: 2
+    skidDamagePerSecond: 1.5
     safeLandingSink: 7
     safeLandingSpeed: 22
-    touchdownGrace: 1
-    groundFriction: 6
-    groundImpactLoss: 0.7
+    touchdownGrace: 1.8
+    groundFriction: 4
+    groundImpactLoss: 0.5
     groundImpactMaxAngle: 20

@@ -14,7 +14,7 @@ namespace DragonRecipe.Flight
     public static class FlightRules
     {
         /// <summary>이 기울기보다 가파른 면(나무, 바위 옆면)은 무조건 충돌</summary>
-        public const float GroundNormalMinY = 0.7f;
+        public const float GroundNormalMinY = 0.5f;
 
         public static ImpactType ClassifyImpact(Vector3 velocity, Vector3 surfaceNormal, FlightParams p)
         {

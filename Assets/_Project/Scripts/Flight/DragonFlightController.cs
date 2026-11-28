@@ -66,11 +66,13 @@ namespace DragonRecipe.Flight
         Vector3 _runStart;
         float _groundTime;
         float _airTime;
-        const float GroundSkin = 0.15f;
+        const float GroundSkin = 0.05f;
         /// <summary>이만큼 더 떠올라야 "지면에서 떨어짐"으로 본다 (닿았다 떨어졌다 깜빡임 방지)</summary>
-        const float LiftOffMargin = 0.3f;
+        const float LiftOffMargin = 0.15f;
         /// <summary>떨어져 있던 시간이 이보다 짧으면 다시 닿아도 새 충격으로 치지 않는다</summary>
         const float ReimpactDelay = 0.25f;
+        /// <summary>경로 검사를 이만큼 뒤에서 시작한다 (이미 면에 붙어 있을 때 엉뚱한 법선이 나오는 것 방지)</summary>
+        const float CastBackoff = 0.1f;
 
         void Awake()
         {
@@ -159,9 +161,7 @@ namespace DragonRecipe.Flight
             float dist = delta.magnitude;
             bool touching = false;
             Vector3 touchPoint = default, touchNormal = Vector3.up, touchVelocity = Model.Velocity;
-            if (dist > 0.0001f &&
-                Physics.SphereCast(from, collisionRadius, delta / dist, out var hit, dist,
-                    ~0, QueryTriggerInteraction.Ignore))
+            if (dist > 0.0001f && SweepPath(from, delta / dist, dist, out var hit))
             {
                 Vector3 velocity = Model.Velocity;
                 if (!FlightRules.IsGround(hit.normal))
@@ -255,6 +255,48 @@ namespace DragonRecipe.Flight
             if (IsFlying) return;
             _rb.rotation = rotation;
             transform.rotation = rotation;
+        }
+
+        /// <summary>
+        /// 이동 경로 검사. SphereCast를 그대로 쓰면 지면을 스치며 날 때 오판이 생긴다.
+        /// - 시작부터 면과 겹치면 점이 (0,0,0), 법선이 진행 반대 방향(수평)으로 나와 "벽"으로 판정됨
+        /// - 바위·절벽 모서리를 스치면 법선이 옆으로 누워, 윗면인데도 "벽"으로 판정됨
+        /// 그래서 시작점을 살짝 물리고, 겹침은 아래 지면으로, 모서리는 실제 면 법선으로 다시 본다.
+        /// </summary>
+        bool SweepPath(Vector3 from, Vector3 dir, float dist, out RaycastHit hit)
+        {
+            Vector3 origin = from - dir * CastBackoff;
+            if (!Physics.SphereCast(origin, collisionRadius, dir, out hit, dist + CastBackoff,
+                    ~0, QueryTriggerInteraction.Ignore))
+                return false;
+
+            if (hit.distance <= 0f)
+            {
+                // 시작부터 겹침: 점·법선을 믿을 수 없다 → 바로 아래 지면에 붙은 것으로 처리
+                if (Physics.Raycast(from + Vector3.up * collisionRadius, Vector3.down, out var down,
+                        collisionRadius * 3f, ~0, QueryTriggerInteraction.Ignore)
+                    && FlightRules.IsGround(down.normal))
+                {
+                    hit = down;
+                    return true;
+                }
+                return false;
+            }
+
+            // 멀어지는 쪽 면(뒤로 물린 구간에서 걸린 것)은 부딪힌 게 아니다
+            if (Vector3.Dot(hit.normal, dir) >= 0f) return false;
+
+            if (!FlightRules.IsGround(hit.normal))
+            {
+                // 모서리 접촉일 수 있다: 닿은 점을 향해 레이를 쏴 실제 면의 법선을 얻는다
+                Vector3 center = origin + dir * hit.distance;
+                Vector3 toPoint = hit.point - center;
+                if (toPoint.sqrMagnitude > 1e-6f &&
+                    hit.collider.Raycast(new Ray(center, toPoint.normalized), out var face, collisionRadius * 2f) &&
+                    FlightRules.IsGround(face.normal))
+                    hit.normal = face.normal;
+            }
+            return true;
         }
 
         void UpdateAltitude()

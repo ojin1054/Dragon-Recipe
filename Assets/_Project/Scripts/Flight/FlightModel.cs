@@ -6,8 +6,6 @@ namespace DragonRecipe.Flight
     {
         /// <summary>스태미나 부족으로 실패</summary>
         Failed,
-        /// <summary>너무 빨리 연타해서 효율이 떨어짐</summary>
-        Weak,
         Normal,
         /// <summary>리듬에 맞춘 날갯짓</summary>
         Perfect
@@ -151,11 +149,6 @@ namespace DragonRecipe.Flight
         /// <summary>마지막 날갯짓 이후 시간으로 효율을 판정</summary>
         public static FlapOutcome JudgeFlapTiming(float timeSinceLast, FlightParams p, out float efficiency)
         {
-            if (timeSinceLast < p.spamInterval)
-            {
-                efficiency = p.spamPenalty;
-                return FlapOutcome.Weak;
-            }
             if (Mathf.Abs(timeSinceLast - p.idealFlapInterval) <= p.perfectWindow)
             {
                 efficiency = p.perfectBonus;

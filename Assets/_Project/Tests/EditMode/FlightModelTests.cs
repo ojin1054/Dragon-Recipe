@@ -64,20 +64,11 @@ namespace DragonRecipe.Tests
         }
 
         [Test]
-        public void SpamFlapping_IsLessEfficientThanRhythm()
-        {
-            var spam = NewHatchling();
-            var rhythm = NewHatchling();
-            Run(spam, 6f, Vector2.zero, flapInterval: 0.1f);
-            Run(rhythm, 6f, Vector2.zero, flapInterval: 0.6f);
-            Assert.Greater(rhythm.Position.y, spam.Position.y);
-        }
-
-        [Test]
         public void FlapTiming_IsJudged()
         {
             var p = new FlightParams();
-            Assert.AreEqual(FlapOutcome.Weak, FlightModel.JudgeFlapTiming(0.1f, p, out _));
+            Assert.AreEqual(FlapOutcome.Normal, FlightModel.JudgeFlapTiming(0.05f, p, out float fast), "빨리 파닥여도 실패가 아님");
+            Assert.AreEqual(1f, fast, 0.001f, "빨리 파닥여도 효율이 깎이지 않음");
             Assert.AreEqual(FlapOutcome.Perfect, FlightModel.JudgeFlapTiming(p.idealFlapInterval, p, out float e));
             Assert.Greater(e, 1f);
             Assert.AreEqual(FlapOutcome.Normal, FlightModel.JudgeFlapTiming(5f, p, out _));
