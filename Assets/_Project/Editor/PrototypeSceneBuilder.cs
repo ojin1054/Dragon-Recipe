@@ -188,6 +188,14 @@ namespace DragonRecipe.EditorTools
             if (created) cfg.care = new CareSettings();
             if (created || cfg.stages == null || cfg.stages.Length == 0) cfg.stages = stages;
             if (cfg.foods == null || cfg.foods.Length == 0) cfg.foods = foods;
+            else
+            {
+                // 새로 생긴 먹이만 뒤에 붙인다 (기존 순서 유지)
+                var merged = new System.Collections.Generic.List<FoodData>(cfg.foods);
+                foreach (var f in foods)
+                    if (f && !merged.Contains(f)) merged.Add(f);
+                cfg.foods = merged.ToArray();
+            }
             if (cfg.farm == null) cfg.farm = new DragonRecipe.Farm.FarmSettings();
             if (!cfg.combineTable) cfg.combineTable = FarmDataBuilder.EnsureTable();
             cfg.nestScene = Path.GetFileNameWithoutExtension(NestScenePath);
@@ -532,6 +540,16 @@ namespace DragonRecipe.EditorTools
                     wander: 3f, flees: true, flee: 9f, weight: 1f), strength: 3f),
                 Hunt(Food("golden_melon", "황금멜론", 6, FoodTrait.Plant, new Color(1f, 0.85f, 0.2f), new Vector3(0.7f, 0.7f, 0.7f),
                     wander: 0f, flees: false, flee: 0f, weight: 1.5f), strength: 6f),
+                Hunt(Food("rabbit", "산토끼", 6, FoodTrait.Meat, new Color(0.92f, 0.88f, 0.8f), new Vector3(0.35f, 0.35f, 0.6f),
+                    wander: 2.5f, flees: true, flee: 10f, weight: 2.5f), strength: 3f, herdMin: 2, herdMax: 4),
+                Hunt(Food("deer", "사슴", 16, FoodTrait.Meat, new Color(0.66f, 0.44f, 0.26f), new Vector3(0.6f, 1f, 1.4f),
+                    wander: 1.2f, flees: true, flee: 9f, weight: 1.5f), strength: 13f, herdMin: 2, herdMax: 3, struggles: true),
+                Hunt(Food("crab", "바위게", 7, FoodTrait.Fish, new Color(0.85f, 0.27f, 0.2f), new Vector3(0.7f, 0.3f, 0.6f),
+                    wander: 0.6f, flees: false, flee: 0f, weight: 2f), strength: 4f, herdMin: 2, herdMax: 4),
+                Hunt(Food("fire_goat", "화염염소", 14, FoodTrait.Fire, new Color(0.8f, 0.3f, 0.14f), new Vector3(0.6f, 0.8f, 1.1f),
+                    wander: 1.4f, flees: true, flee: 7f, weight: 1f), strength: 12f, herdMin: 1, herdMax: 2, struggles: true),
+                Hunt(Food("mushroom", "숲버섯", 5, FoodTrait.Plant, new Color(0.82f, 0.2f, 0.24f), new Vector3(0.5f, 0.6f, 0.5f),
+                    wander: 0f, flees: false, flee: 0f, weight: 1.5f), strength: 2f, herdMin: 2, herdMax: 4),
             };
         }
 

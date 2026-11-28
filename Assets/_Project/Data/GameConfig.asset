@@ -35,6 +35,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d37f181f412578f42b8278090916aeea, type: 2}
   - {fileID: 11400000, guid: 8d7bf1f365c3ca549a23719ac9bbde04, type: 2}
   - {fileID: 11400000, guid: aed3bcbdeed991949ba039f86435a50e, type: 2}
+  - {fileID: 11400000, guid: afc801b3ccd34b75bccb8d7446107dc2, type: 2}
+  - {fileID: 11400000, guid: 72be1697742f47078f01e5c357ccd5bd, type: 2}
+  - {fileID: 11400000, guid: 0180e82abfaf4eeaa5523c7b6f9ff6c4, type: 2}
+  - {fileID: 11400000, guid: 9cecc6c0a79c4c5f9345f5c0a3aa0bbe, type: 2}
+  - {fileID: 11400000, guid: 0c97389554d64269a8b4cb0b9858346c, type: 2}
   farm:
     basePenCapacity: 4
     penUpgrades:

@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0aab56ee24598744da4a962e0513aa3c, type: 3}
+  m_Name: Food_fire_goat
+  m_EditorClassIdentifier: DragonRecipe.Runtime::DragonRecipe.Food.FoodData
+  schema: 2
+  id: fire_goat
+  displayName: "\uD654\uC5FC\uC5FC\uC18C"
+  satiety: 14
+  trait: 2
+  icon: {fileID: 21300000, guid: b823ec5f44d541609ecd838d9487fcad, type: 3}
+  color: {r: 0.8, g: 0.3, b: 0.14, a: 1}
+  bodySize: {x: 0.6, y: 0.8, z: 1.1}
+  wanderSpeed: 1.4
+  flees: 1
+  fleeSpeed: 7
+  fleeRadius: 25
+  herdMin: 1
+  herdMax: 2
+  scatterSpeed: 5
+  strength: 12
+  struggles: 1
+  spawnWeight: 1
