@@ -53,6 +53,13 @@ namespace DragonRecipe.Food
         [Tooltip("매달린 채 버둥거려 드래곤을 흔든다. 제대로(아슬아슬하게) 못 잡으면 걷어차인다")]
         public bool struggles;
 
+        [Header("서식지")]
+        [Tooltip("사는 곳. Auto면 먹이 id로 정한다 (HabitatRules)")]
+        public Habitat habitat = Habitat.Auto;
+
+        /// <summary>움직이지도 도망가지도 않는 것 (버섯·멜론 같은 식물). 드래곤을 알아채지 못한다</summary>
+        public bool IsStationary => !flees && wanderSpeed <= 0f;
+
         [Header("스폰")]
         [Tooltip("스폰 가중치 (클수록 자주 등장)")]
         public float spawnWeight = 1f;

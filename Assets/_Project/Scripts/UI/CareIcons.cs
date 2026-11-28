@@ -131,38 +131,60 @@ namespace DragonRecipe.UI
             return row;
         }
 
-        /// <summary>비행 결과 화면 제목 (착지 / 추락)</summary>
+        /// <summary>비행 결과 화면 제목 배지 (추락했을 때만)</summary>
         public static void ResultTitle(IconFlow flow, UIIconSet set, FlightResult r)
         {
             flow.Clear();
+            if (!r.Injured) return; // 무사히 내리면 배지를 띄우지 않는다
             var row = flow.AddRow();
-            if (!r.Injured) row.Icon(set.check, 1.6f);
-            else if (r.reason == FlightEndReason.OutOfBounds) row.Icon(set.arrowDown, 1.6f).Icon(set.boom, 1.6f).Icon(set.bandage, 1.6f);
-            else row.Icon(set.boom, 1.6f).Icon(set.bandage, 1.6f);
+            if (r.reason == FlightEndReason.OutOfBounds) row.Icon(set.arrowDown).Icon(set.boom).Text("추락");
+            else row.Icon(set.boom).Text("추락");
         }
 
-        /// <summary>비행 결과 화면 본문</summary>
-        public static void ResultBody(IconFlow flow, UIIconSet set, FlightResult r, FlightCareReport report)
+        /// <summary>
+        /// 비행 결과 화면 하단 띠 (두 줄).
+        /// 첫 줄: 체공 · 최고 속도 · 아슬아슬 · 연속 사냥 | 잡은 먹이.
+        /// 둘째 줄: 그 먹이가 어디로 갔는지 (먹음 / 창고 / 떨어뜨림 / 도감 / 희귀) 와 성장 · 부상.
+        /// </summary>
+        public static void ResultStrip(IconFlow flow, UIIconSet set, FlightResult r, FlightCareReport report)
         {
             flow.Clear();
-            flow.AddRow().Icon(set.clock).Text($"{r.airtime:0.0}s").Gap(40f).Icon(set.wind).Text($"{r.maxSpeed * 3.6f:0} km/h");
-            var skill = flow.AddRow().Icon(set.target).Text($"{r.nearMissCount}");
-            if (r.maxCombo >= 2) skill.Gap(40f).Text($"combo {r.maxCombo}", Good); // 연속 사냥
+            var top = flow.AddRow().Icon(set.clock).Text($"{r.airtime:0.0}s")
+                .Gap(28f).Icon(set.wind).Text($"{r.maxSpeed * 3.6f:0}")
+                .Gap(28f).Icon(set.target).Text($"{r.nearMissCount}");
+            if (r.maxCombo >= 2) top.Gap(28f).Icon(set.claw).Text($"x{r.maxCombo}", Good); // 연속 사냥
 
-            // 잡은 먹이: 종류별 얼굴을 잡은 수만큼 (한 줄에 다 들어가게 종류당 최대 8개)
             var foods = new List<FoodData>();
             foreach (var c in r.caught) foods.Add(c.food);
-            if (foods.Count > 0) Foods(flow.AddRow(), set, foods, maxIcons: 8);
+            top.Gap(44f);
+            if (foods.Count > 0) Foods(top, set, foods, maxIcons: 3);
+            else top.Icon(set.meat).Icon(set.no); // 먹이를 못 잡았어요
 
-            if (report != null)
+            var bottom = flow.AddRow();
+            bool any = false;
+            if (report != null && report.foodCount > 0)
             {
-                Report(flow, set, report, includeFoods: false, simple: true);
+                // 날면서 먹음 → 바로 배가 참
+                if (report.eaten.Count > 0) { bottom.Icon(set.wing).Icon(set.meat).Text($"+{report.absorbed:0}").Gap(28f); any = true; }
+                // 둥지까지 들고 옴 → 창고
+                if (report.stored.Count > 0) { bottom.Icon(set.basket).Text($"+{report.stored.Count}").Gap(28f); any = true; }
+                // 창고가 가득 차 버림
+                if (report.overflow.Count > 0) { bottom.Icon(set.basket).Icon(set.no).Text($"{report.overflow.Count}", Bad).Gap(28f); any = true; }
+                // 추락하며 떨어뜨림
+                if (report.dropped.Count > 0) { bottom.Icon(set.boom).Icon(set.arrowDown).Text($"{report.dropped.Count}", Bad).Gap(28f); any = true; }
+                // 도감에 새로 오름 / 희귀 개체
+                if (report.newInCodex.Count > 0) { Foods(bottom.Icon(set.book).Text("+").Gap(8f), set, report.newInCodex); bottom.Gap(16f); any = true; }
+                if (report.rareCount > 0) { bottom.Icon(set.sparkle).Text($"x{report.rareCount}", Good).Gap(28f); any = true; }
             }
-            else
+            if (report != null && report.grew)
             {
-                if (foods.Count == 0) flow.AddRow().Icon(set.meat).Icon(set.no);
-                if (r.Injured) flow.AddRow().Icon(set.bandage).Icon(set.arrowRight).Icon(set.potion);
+                bottom.Icon(set.star).Icon(set.sprout, 1.2f).Icon(set.star); // 성장했어요
+                if (report.newForm != DragonForm.None) bottom.Icon(set.dragon, 1.2f, DragonLook.FormColor(report.newForm));
+                bottom.Gap(28f);
+                any = true;
             }
+            if (r.Injured) { bottom.Icon(set.bandage).Icon(set.arrowRight).Icon(set.potion); any = true; } // 다쳤어요 → 치료약
+            if (!any) bottom.Gap(1f);
         }
     }
 }

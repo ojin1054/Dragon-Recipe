@@ -20,6 +20,12 @@ namespace DragonRecipe.Food
         public bool IsHeld => Time.time < _heldUntil;
         /// <summary>불 스킬에 익음: 잡으면 포만도가 더 크다</summary>
         public bool IsCooked { get; private set; }
+        /// <summary>이 동물을 기르는 종족 (없으면 야생). 낚아채면 그 종족이 싫어한다</summary>
+        public DragonRecipe.Tribes.Tribe? Owner { get; private set; }
+        /// <summary>가축: 무리가 지금 모여 있는 자리. 무리가 옮겨 다니면 따라 바뀐다</summary>
+        public Vector3 Home { get; private set; }
+        public float HomeRadius { get; private set; }
+        public bool HasHome => HomeRadius > 0f;
         /// <summary>익힌 먹이 포만도 배율</summary>
         public const float CookedSatietyMultiplier = 1.5f;
 
@@ -33,6 +39,7 @@ namespace DragonRecipe.Food
         PreySpawner _spawner;
         Renderer[] _parts;
         GameObject _sparkle;
+        Renderer _ownerMark;
         MaterialPropertyBlock _block;
         Vector3 _wanderDir;
         float _nextTurn;
@@ -40,6 +47,9 @@ namespace DragonRecipe.Food
         float _scale = 1f;
         Vector3 _scatterFrom;
         float _scatterUntil = -1f;
+        System.Func<Vector3, bool> _inHabitat;
+        Vector3 _habitatAnchor;
+        bool _habitatHard;
         float _heldUntil = -1f;
 
         public void Init(FoodData data, PreySpawner spawner, Transform threat, Renderer[] parts = null, GameObject sparkle = null)
@@ -51,8 +61,40 @@ namespace DragonRecipe.Food
             _sparkle = sparkle;
         }
 
+        /// <summary>
+        /// 종족이 기르는 가축으로 만든다: 무리 자리(home) 둘레에 머물고, 몸에 종족 색 띠를 두른다.
+        /// </summary>
+        public void SetOwner(DragonRecipe.Tribes.Tribe owner, Vector3 home, float radius, Renderer mark, Color markColor)
+        {
+            Owner = owner;
+            Home = home;
+            HomeRadius = Mathf.Max(0.1f, radius);
+            _ownerMark = mark;
+            if (!mark) return;
+            var b = new MaterialPropertyBlock();
+            b.SetColor(BaseColorId, markColor);
+            b.SetColor(ColorId, markColor);
+            mark.SetPropertyBlock(b);
+            mark.gameObject.SetActive(true);
+        }
+
+        /// <summary>
+        /// 서식지를 정한다 (Place 뒤에 부른다). 돌아다니다 벗어나면 anchor 쪽으로 돌아오고,
+        /// hard면 (물고기) 도망칠 때도 밖으로 나가지 못한다.
+        /// </summary>
+        public void SetHabitat(Vector3 anchor, System.Func<Vector3, bool> inHabitat, bool hard)
+        {
+            _habitatAnchor = anchor;
+            _inHabitat = inHabitat;
+            _habitatHard = hard;
+        }
+
+        /// <summary>무리가 옮겨 감: 모이는 자리를 바꾼다</summary>
+        public void MoveHome(Vector3 home) => Home = home;
+
         public void Place(Vector3 groundPoint, bool rare = false)
         {
+            _inHabitat = null;
             IsRare = rare;
             _scale = rare ? RareScale : 1f;
             transform.localScale = Vector3.one * _scale;
@@ -94,7 +136,7 @@ namespace DragonRecipe.Food
         /// <summary>from에서 멀어지는 쪽으로 duration 동안 달아난다 (무리 중 하나가 잡혔을 때)</summary>
         public void Scatter(Vector3 from, float duration)
         {
-            if (!IsAvailable) return;
+            if (!IsAvailable || Data.IsStationary) return; // 버섯·멜론은 달아나지 않는다
             _scatterFrom = from;
             _scatterUntil = Time.time + duration;
         }
@@ -149,12 +191,35 @@ namespace DragonRecipe.Food
                     _wanderDir = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
                     _nextTurn = Time.time + Random.Range(2f, 5f);
                 }
+                // 가축은 무리에서 멀어지면 무리 쪽으로 돌아온다
+                if (HasHome)
+                {
+                    Vector3 toHome = Home - transform.position;
+                    toHome.y = 0f;
+                    if (toHome.sqrMagnitude > HomeRadius * HomeRadius) _wanderDir = toHome.normalized;
+                }
+                // 서식지를 벗어났으면 돌아온다 (도망치다 나간 뒤 등)
+                if (_inHabitat != null && !_inHabitat(transform.position))
+                {
+                    Vector3 back = _habitatAnchor - transform.position;
+                    back.y = 0f;
+                    if (back.sqrMagnitude > 0.01f) _wanderDir = back.normalized;
+                }
                 move = _wanderDir;
                 speed = Data.wanderSpeed;
             }
 
             Vector3 next = transform.position + move * (speed * Time.deltaTime);
             if (_spawner) next = _spawner.ClampToArea(next);
+            // 물고기는 물 밖으로 못 나간다: 가장자리에서 멈추고 안쪽으로 방향을 튼다
+            if (_habitatHard && _inHabitat != null && !_inHabitat(next) && _inHabitat(transform.position))
+            {
+                next = transform.position;
+                Vector3 back = _habitatAnchor - transform.position;
+                back.y = 0f;
+                if (back.sqrMagnitude > 0.01f) _wanderDir = back.normalized;
+                _nextTurn = Time.time + 1.5f;
+            }
             next.y = _groundY + HalfHeight;
             transform.position = next;
             if (move.sqrMagnitude > 0.001f)

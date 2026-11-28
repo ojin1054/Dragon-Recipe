@@ -182,23 +182,6 @@ namespace DragonRecipe.UI
             return $"\n{CareLogic.StageName(s.stage)} · 포만도 {s.hunger / c.maxHunger * 100f:0}%{status}";
         }
 
-        static string RunUpPrompt(RunUpModel run, FlightParams p)
-        {
-            if (run == null) return "";
-            string toEdge = $"절벽 끝까지 {Mathf.Max(0f, run.Remaining):0.0} m";
-            if (run.IsCrouching)
-                return run.CrouchDepth(p) < 1f
-                    ? $"웅크리는 중…\n{toEdge}"
-                    : $"흰 선에서 웅크리기 버튼을 떼세요!\n{toEdge}";
-            if (run.InJumpZone(p))
-                return $"지금 웅크리기(Shift / B)를 꾹!\n{toEdge}";
-            if (run.Started)
-                return $"날갯짓 연타! 노란 구간에서 웅크리기(Shift / B)를 꾹\n{toEdge}";
-            return "날갯짓 버튼(Space / A) 연타로 절벽까지 달리기! (빠를수록 빠르게)\n" +
-                   "노란 구간에서 웅크리기(Shift / B) 꾹 → 흰 선에서 떼기! (잘 뛸수록 높게)\n" +
-                   "조이스틱: 기수·선회 · 일시정지: Esc / P / Start";
-        }
-
         void Update()
         {
             if (!session || !dragon) return;
@@ -242,12 +225,12 @@ namespace DragonRecipe.UI
             UpdatePerfectFlash();
             UpdateHealth(m);
             if (staminaLabel)
-                staminaLabel.text = run == null ? "스태미나" : run.IsCrouching ? "웅크리기 (높이)" : "달리기 파워 (속도)";
+                staminaLabel.text = run == null ? "스태미나" : ""; // 이륙 전에는 글자 없이 바 색으로만 구분한다 (달리기 = 주황, 웅크리기 = 노랑)
 
             if (promptText)
             {
-                promptText.enabled = session.Current == FlightSession.State.Ready;
-                promptText.text = RunUpPrompt(run, p);
+                // 달리기·웅크리기 안내 문구는 띄우지 않는다 (게이지와 바닥 표시로 보여 준다)
+                promptText.enabled = false;
             }
 
             bool ready = session.Current == FlightSession.State.Ready;

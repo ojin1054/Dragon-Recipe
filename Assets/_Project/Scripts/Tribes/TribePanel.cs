@@ -29,6 +29,8 @@ namespace DragonRecipe.Tribes
         }
 
         static readonly Color PanelBg = new Color(0.08f, 0.1f, 0.14f, 0.75f);
+        /// <summary>둥지에서 호감도 칸을 줄여 그리는 배율</summary>
+        const float NestScale = 0.72f;
         static readonly Color Up = new Color(0.45f, 1f, 0.45f);
         static readonly Color Down = new Color(1f, 0.4f, 0.35f);
         static readonly Color Gold = new Color(1f, 0.84f, 0.25f);
@@ -85,20 +87,22 @@ namespace DragonRecipe.Tribes
             _root = (RectTransform)transform;
             if (_compact)
             {
-                Place(_root, new Vector2(1, 1), new Vector2(-40, -195), new Vector2(390, 120), new Vector2(1, 1));
+                // 비행 중에는 호감도 게이지를 보이지 않는다. 방어전 상태만 띄운다
+                Place(_root, new Vector2(1, 1), new Vector2(-40, -195), new Vector2(390, 0), new Vector2(1, 1));
                 BuildDefense();
             }
             else
             {
-                Place(_root, new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(600, 330), new Vector2(0.5f, 1));
-                Img(_root, "Bg", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, PanelBg);
+                // 둥지: 드래곤을 가리지 않게 위쪽에 작고 옅게 둔다 (전쟁 칸은 화면 아래 가운데로 따로 뺀다)
+                Place(_root, new Vector2(0.5f, 1), new Vector2(0, -16), new Vector2(600, 275), new Vector2(0.5f, 1));
+                _root.localScale = Vector3.one * NestScale;
+                Img(_root, "Bg", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Color(PanelBg.r, PanelBg.g, PanelBg.b, 0.45f));
             }
 
-            float col = _compact ? 125f : 190f;
-            foreach (var t in TribeLogic.All)
+            if (!_compact)
             {
-                float x = ((int)t - 1) * col;
-                _gauges.Add(MakeGauge(t, x));
+                foreach (var t in TribeLogic.All)
+                    _gauges.Add(MakeGauge(t, ((int)t - 1) * 190f));
             }
             if (!_compact)
             {
@@ -107,8 +111,8 @@ namespace DragonRecipe.Tribes
                 h.childAlignment = TextAnchor.MiddleCenter;
                 h.spacing = 6f;
                 h.childControlWidth = h.childControlHeight = false;
-                _war = Box(_root, "War", new Vector2(0.5f, 0), new Vector2(0, -12), new Vector2(600, 200));
-                _war.pivot = new Vector2(0.5f, 1);
+                _war = Box((RectTransform)_root.parent, "TribeWar", new Vector2(0.5f, 0), new Vector2(0, 24), new Vector2(600, 200));
+                _war.pivot = new Vector2(0.5f, 0);
 
                 DragonCare.CollectOfferings(); // 창고에 자리가 생겼으면 제단의 제물을 옮긴다
                 ShowLastReport();
@@ -117,7 +121,11 @@ namespace DragonRecipe.Tribes
             foreach (var g in _gauges) g.shownRep = Rep(g.tribe);
         }
 
-        void OnDestroy() => DragonCare.TribesChanged -= OnTribesChanged;
+        void OnDestroy()
+        {
+            DragonCare.TribesChanged -= OnTribesChanged;
+            if (_war && _war.parent != _root) Destroy(_war.gameObject); // 패널 밖에 둔 전쟁 칸
+        }
 
         void BuildDefense()
         {

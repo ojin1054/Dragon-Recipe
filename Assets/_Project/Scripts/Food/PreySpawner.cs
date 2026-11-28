@@ -35,8 +35,33 @@ namespace DragonRecipe.Food
 
         readonly List<Prey> _prey = new List<Prey>();
         int _nextHerd;
+        HabitatMap _habitats;
+
+        /// <summary>씬의 연못·나무·바위 (처음 쓸 때 한 번 모은다)</summary>
+        public HabitatMap Habitats => _habitats ??= HabitatMap.Scan();
 
         public IReadOnlyList<Prey> All => _prey;
+
+        /// <summary>새 무리 번호</summary>
+        public int NewHerdId() => _nextHerd++;
+
+        /// <summary>
+        /// 종족이 기르는 가축 한 마리를 무리 자리(home) 둘레에 만든다. 야생 먹이 수(count)와 따로 센다.
+        /// 잡히면 잠시 뒤 무리 곁에 다시 나온다.
+        /// </summary>
+        public Prey SpawnOwned(FoodData food, DragonRecipe.Tribes.Tribe owner, Vector3 home, float radius, int herdId, Color markColor)
+        {
+            if (!food) return null;
+            var prey = Create(food);
+            prey.HerdId = herdId;
+            // 종족 색 띠: 몸통을 한 바퀴 두른다 (몸 색을 칠할 때 같이 칠해지지 않게 따로 둔다)
+            var mark = AddPart(prey.transform, PrimitiveType.Cube, new Vector3(0f, 0f, food.bodySize.z * 0.12f),
+                new Vector3(food.bodySize.x + 0.08f, food.bodySize.y + 0.08f, Mathf.Max(0.14f, food.bodySize.z * 0.16f)));
+            mark.name = "OwnerMark";
+            prey.SetOwner(owner, home, radius, mark, markColor);
+            PlaceRandom(prey);
+            return prey;
+        }
 
         void Start()
         {
@@ -103,12 +128,15 @@ namespace DragonRecipe.Food
             float total = 0f;
             foreach (var f in foods) total += Mathf.Max(0f, f.spawnWeight);
             float r = Random.value * total;
+            FoodData last = null;
             foreach (var f in foods)
             {
-                r -= Mathf.Max(0f, f.spawnWeight);
+                if (f.spawnWeight <= 0f) continue; // 가축 등 야생으로 나오지 않는 먹이
+                last = f;
+                r -= f.spawnWeight;
                 if (r <= 0f) return f;
             }
-            return foods[foods.Length - 1];
+            return last ? last : foods[foods.Length - 1];
         }
 
         Prey FindHerdmate(Prey prey)
@@ -119,18 +147,48 @@ namespace DragonRecipe.Food
             return null;
         }
 
+        /// <summary>가축: 무리 둘레의 땅에 놓는다</summary>
+        void PlaceAtHome(Prey prey)
+        {
+            for (int attempt = 0; attempt < 20; attempt++)
+            {
+                var off = Random.insideUnitCircle * prey.HomeRadius;
+                var p = ClampToArea(prey.Home + new Vector3(off.x, 0, off.y));
+                p.y = 200f;
+                if (!Physics.Raycast(p, Vector3.down, out var hit, 400f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                if (hit.normal.y < 0.95f || hit.point.y > 1f) continue;
+                prey.Place(hit.point);
+                return;
+            }
+            prey.Place(new Vector3(prey.Home.x, 0f, prey.Home.z));
+        }
+
         void PlaceRandom(Prey prey)
         {
+            if (prey.HasHome)
+            {
+                PlaceAtHome(prey);
+                return;
+            }
             bool rare = Random.value < rareChance;
             Vector2 half = areaSize * 0.5f;
             var mate = FindHerdmate(prey);
-            for (int attempt = 0; attempt < 30; attempt++)
+            // 동물마다 맞는 곳에만 놓는다 (연어 = 연못, 멧돼지 = 숲, 불꽃도마뱀 = 바위 ...)
+            var habitat = HabitatRules.Resolve(prey.Data);
+            var map = Habitats;
+            for (int attempt = 0; attempt < 50; attempt++)
             {
                 Vector3 p;
                 if (mate && attempt < 20)
                 {
                     var off = Random.insideUnitCircle * herdSpread;
                     p = ClampToArea(mate.transform.position + new Vector3(off.x, 0, off.y));
+                    p.y = 200f;
+                }
+                else if (map.TrySample(habitat, out p))
+                {
+                    // 구역 밖의 연못·나무·바위는 건너뛴다
+                    if (Mathf.Abs(p.x - areaCenter.x) > half.x || Mathf.Abs(p.z - areaCenter.z) > half.y) continue;
                     p.y = 200f;
                 }
                 else
@@ -143,7 +201,9 @@ namespace DragonRecipe.Food
                 if (new Vector2(p.x, p.z).magnitude < keepOutRadius) continue;
                 if (!Physics.Raycast(p, Vector3.down, out var hit, 400f, ~0, QueryTriggerInteraction.Ignore)) continue;
                 if (hit.normal.y < 0.95f || hit.point.y > 1f) continue; // 나무/바위/절벽 위는 제외
+                if (!map.Fits(habitat, hit.point)) continue;
                 prey.Place(hit.point, rare);
+                prey.SetHabitat(hit.point, pt => map.Fits(habitat, pt), habitat == Habitat.Water);
                 return;
             }
             prey.MarkCaught(); // 자리를 못 찾으면 잠시 숨겨 둠
